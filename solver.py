@@ -10,20 +10,20 @@ def calcDispFromPYCurve(p, pyCurve):
     coeff = pyCurve["coeff"]
     pLim = pyCurve["pLim"]
     if len(coeff) == 1:
-        if p < pLim[0]:
+        if p >= pLim[0]:
             p = pLim[0]
-        elif pLim[1] <= p:
+        elif p <= pLim[1]:
             p = pLim[1]
         x = (p - coeff[0][1]) / coeff[0][0]
     else:
-        if p < pLim[0]:
+        if p > pLim[0]:
             index = 0
             p = pLim[0]
-        elif pLim[0] <= p and pLim[1]:
+        elif pLim[1]<=p and p<=pLim[0]:
             index = 0
-        elif pLim[1] <= p and pLim[2]:
+        elif pLim[2]<=p and p<=pLim[1]:
             index = 1
-        elif pLim[2] <= p and pLim[3]:
+        elif pLim[3]<=p and p<=pLim[2]:
             index = 2
         else:
             index = 2
@@ -80,11 +80,11 @@ def KhFromPYCurve(p, pyCurve, i):
             Kh = -coeff[2][0]
             testNum = 4
         
-    if i==8:
-        print("coeff: ", coeff)
-        print("p: ", p)
-        print("pLim: ", pLim)
-        print("testNum: ", testNum)
+    # if i==3:
+    #     print("coeff: ", coeff)
+    #     print("p: ", p)
+    #     print("pLim: ", pLim)
+    #     print("testNum: ", testNum)
     return Kh
 
 
@@ -158,9 +158,6 @@ def makeMatrix(model, properties):
             pyCurve = model["pyCurve"][i]
             x = dispVec[i][0]
             pNew = calcForceFromPYCurve(x, pyCurve)
-
-
-            
             # if i == 8:
             #     print('----------------------------')
             #     print("pBefore:" ,qVec[i], "  ", "pAfter: ", pNew)
@@ -182,8 +179,8 @@ def makeMatrix(model, properties):
             xBefore = beforeDispVec[i][0]
             xAfter = dispVec[i][0]
 
-            if i == 8:
-                print("Before:" ,xBefore, "  ", "xAfter: ", xAfter)
+            # if i == 8:
+            #     print("Before:" ,xBefore, "  ", "xAfter: ", xAfter)
             err = abs(xAfter - xBefore)
             check = err <= errMax
             checkVec[checkNum] = check

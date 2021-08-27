@@ -10,20 +10,20 @@ def calcDispFromPYCurve(p, pyCurve):
     coeff = pyCurve["coeff"]
     pLim = pyCurve["pLim"]
     if len(coeff) == 1:
-        if p < pLim[0]:
+        if p >= pLim[0]:
             p = pLim[0]
-        elif pLim[1] <= p:
+        elif p <= pLim[1]:
             p = pLim[1]
         x = (p - coeff[0][1]) / coeff[0][0]
     else:
-        if p < pLim[0]:
+        if p >= pLim[0]:
             index = 0
             p = pLim[0]
-        elif pLim[0] <= p and pLim[1]:
+        elif pLim[1] <= p and p < pLim[0]:
             index = 0
-        elif pLim[1] <= p and pLim[2]:
+        elif pLim[2] <= p and p < pLim[1]:
             index = 1
-        elif pLim[2] <= p and pLim[3]:
+        elif pLim[3] <= p and p < pLim[2]:
             index = 2
         else:
             index = 2
@@ -64,27 +64,30 @@ def KhFromPYCurve(p, pyCurve, i):
     pLim = pyCurve["pLim"]
 
     if len(coeff) == 1:
-        Kh = 0 if p <= pLim[0] or pLim[1] <= p else -coeff[0]
+        Kh = 0 if p >= pLim[0] or pLim[1] >= p else -coeff[0][0]
         testNum = 0
     else:
-        if p <= pLim[3] or pLim[0] <= p:
+        if p <= pLim[3]:
             Kh = 0
             testNum = 1
-        elif pLim[1] < p and p <= pLim[0]:
-            Kh = -coeff[0][0]
+        elif pLim[3] < p and p <= pLim[2]:
+            Kh = -coeff[2][0]
             testNum = 2
         elif pLim[2] < p and p <= pLim[1]:
             Kh = -coeff[1][0]
             testNum = 3
-        elif pLim[3] < p and p <= pLim[2]:
-            Kh = -coeff[2][0]
+        elif pLim[1] < p and p <= pLim[0]:
+            Kh = -coeff[0][0]
             testNum = 4
-        
-    if i==3:
-        print("coeff: ", coeff)
-        print("p: ", p)
-        print("pLim: ", pLim)
-        print("testNum: ", testNum)
+        else:
+            Kh = 0
+            testNum = 5
+    # print(testNum)
+    # if i==3:
+    #     print("coeff: ", coeff)
+    #     print("p: ", p)
+    #     print("pLim: ", pLim)
+    #     print("testNum: ", testNum)
     return Kh
 
 
@@ -150,35 +153,52 @@ def makeMatrix(model, properties):
 
     test = 0
     dummyNodeInfo = copy.deepcopy(model["node"])
-    errMax = 1
-    while False in checkVec and test != 200:
-        
+    errMax = 0.1
+    khList = np.zeros(numRealNode)
+    while False in checkVec and test != 1001:
+    # while False in checkVec:
+
         beforeDispVec = copy.deepcopy(dispVec)
         for i in range(2, numTotalNode-2):
             checkNum = i-2
             # if not checkVec[checkNum]:
+            isExcavation = model["node"][i]["isExcavation"]
             pyCurve = model["pyCurve"][i]
             Kh = dummyNodeInfo[i]["Kh"]
             x = dispVec[i][0]
-            pNew = calcForceFromPYCurve(x, pyCurve) if Kh!=0 else qVec[i]
-            # pNew = qVec[i] + 2*Kh*x
-            err = abs(qVec[i] - pNew)
-            
+            # pNew = calcForceFromPYCurve(x, pyCurve) if Kh!=0 else qVec[i]
+            # pNew = calcForceFromPYCurve(x, pyCurve)
+            if isExcavation:
+                if Kh == 0:
+                    pNew = qVec[i]
+                else:
+                    pNew = calcForceFromPYCurve(x, pyCurve)
+            else:
+                if Kh != 0:
+                    if x*qVec[i] < 0:
+                        pNew = qVec[i] + Kh*x
+                    else:
+                        pNew = qVec[i] - Kh*x
+                else:
+                    pNew = calcForceFromPYCurve(x, pyCurve)
+
+            deff = qVec[i] - pNew
+            err = abs(deff) / abs(qVec[i])
+
             check = err <= errMax
             checkVec[checkNum] = check
-        
 
+            # if i == 3:
+            #     print('----------------------------')
+            #     print(test)
+            #     print("pBefore:" ,qVec[i], "  ", "pAfter: ", pNew)
 
-        
-            if i == 3:
-                print('----------------------------')
-                print(test)
-                print("pBefore:" ,qVec[i], "  ", "pAfter: ", pNew)
-        
             qVec[i] = pNew
             forceVec[i][0] = qVec[i] * coeffVec[i]
             Kh = KhFromPYCurve(pNew, pyCurve, i)
+            khList[checkNum] = Kh
             dummyNodeInfo[i]["Kh"] = Kh
+
             # if i==8:
             #     print("kh ",Kh)
             # if i == 3:
@@ -188,20 +208,10 @@ def makeMatrix(model, properties):
         kMatrix = stiffnessMatrix(dummyNodeInfo, EI)
         kInverse = np.linalg.inv(kMatrix)
         dispVec = np.matmul(kInverse, forceVec)
-        print("uBefore:" ,beforeDispVec[3][0], "  ", "uAfter: ", dispVec[3][0])
+        # print("uBefore:" ,beforeDispVec[3][0], "  ", "uAfter: ", dispVec[3][0])
 
-        # for i in range(2, len(dispVec)-2):
-        #     checkNum = i - 2
-        #     xBefore = beforeDispVec[i][0]
-        #     xAfter = dispVec[i][0]
-
-            # if i == 3:
-            #     print("Before:" ,xBefore, "  ", "xAfter: ", xAfter)
-        #     err = abs(xAfter - xBefore)
-        #     check = err <= errMax
-        #     checkVec[checkNum] = check
-        
         test += 1
-    print(checkVec[0:10])
-        
+    print(checkVec[0:len(checkVec)-1])
+    print(khList)
+
     return {"qVec": qVec.reshape(1, numTotalNode), "dispVec": dispVec.reshape(1, numTotalNode)}

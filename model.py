@@ -15,7 +15,7 @@ def makeModelObj(layers, q=0, gammaW=10):
     qUpperSoil2 = 0
     nodeNum = 3
     dhInit = 0.01
-    dhInit = 0.5
+    dhInit = 0.1
     qTestList = [[-8, -10.5],[-10.5,-13],[-13,-1],[19,1],[1,-2],[-2,0]]
     # qTestList = [[0,-3.61],[7.6,2.0],[7.6,0],[0,-2],[-2,1.5],[1.5,-3.2]]
     for i in range(len(layers)):
@@ -129,12 +129,12 @@ def makeModelObj(layers, q=0, gammaW=10):
                 {"number": nodeNum+1, "y": h2 - dh*2, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "qTest":qTest})
             for j in range(2):
                 result["pyCurve"].append(
-                    {"coeff": coeff, "xLim": xLim, "pLim": pLim})
-                result["pressure"]["backSide"]["rest"].append(p01)
-                result["pressure"]["backSide"]["active"].append(pa1)
-                result["pressure"]["backSide"]["passive"].append(pp1)
-                result["pressure"]["excavationSide"]["rest"].append(p02)
-                result["pressure"]["excavationSide"]["active"].append(pa2)
-                result["pressure"]["excavationSide"]["passive"].append(pp2)
+                    {"coeff": [[0, 0]], "xLim": [0, 0], "pLim": [0, 0]})
+                result["pressure"]["backSide"]["rest"].append(0)
+                result["pressure"]["backSide"]["active"].append(0)
+                result["pressure"]["backSide"]["passive"].append(0)
+                result["pressure"]["excavationSide"]["rest"].append(0)
+                result["pressure"]["excavationSide"]["active"].append(0)
+                result["pressure"]["excavationSide"]["passive"].append(0)
 
     return result

@@ -4,7 +4,7 @@ import json
 import math
 import copy
 
-from numpy.matrixlib.defmatrix import matrix
+# from numpy.matrixlib.defmatrix import matrix
 
 import model
 import modelMM
