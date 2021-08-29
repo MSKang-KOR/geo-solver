@@ -1,8 +1,13 @@
-import math
 
-N = [11,35,42]
+import numpy as np
+a = [1,2,3,4,5]
 
+def test(a):
+    # b = np.array(a)
+    # b = 10*b
+    return np.array(a)
 
-for i in range(3):
-    k = 0.691*N[i]**(0.406) * 1e4
-    print(k)
+b = test(a)
+
+print(type(a))
+print(type(b))

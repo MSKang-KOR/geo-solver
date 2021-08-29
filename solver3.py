@@ -82,12 +82,6 @@ def KhFromPYCurve(p, pyCurve, i):
         else:
             Kh = 0
             testNum = 5
-    # print(testNum)
-    # if i==3:
-    #     print("coeff: ", coeff)
-    #     print("p: ", p)
-    #     print("pLim: ", pLim)
-    #     print("testNum: ", testNum)
     return Kh
 
 
@@ -110,7 +104,6 @@ def stiffnessMatrix(nodeInfo, EI):
         else:
             a = np.zeros(i-2)
             alpha = 6 + Kh * (h**4)/EI
-            # print(alpha)
             b = np.array([1, -4, alpha, -4, 1])
             c = np.append(a, b)
             d = np.zeros(length - len(a) - len(b))
@@ -120,7 +113,47 @@ def stiffnessMatrix(nodeInfo, EI):
     return kMatrix
 
 
-def makeMatrix(model, properties):
+def renewMatrix(model, numTotalNode, errMax, nodeForLoop, dispVec, checkVec, qVec):
+    KhList = np.zeros(numTotalNode-4)
+    qVecNew = copy.deepcopy(qVec)
+    nodeForLoopNew = copy.deepcopy(nodeForLoop)
+    checkVecNew = copy.deepcopy(checkVec)
+    # print(dispVec)
+    for i in range(2, numTotalNode-2):
+        checkNum = i-2
+        isExcavation = model["node"][i]["isExcavation"]
+        pyCurve = model["pyCurve"][i]
+        KhBefore = nodeForLoopNew[i]["Kh"]
+        xBefore = dispVec[i][0]
+        pForCheck = calcForceFromPYCurve(xBefore, pyCurve)
+        deff = qVecNew[i] / pForCheck
+        err = 1 - abs(deff)
+        check = err <= errMax
+        checkVecNew[checkNum] = check
+
+        # if check:
+        if isExcavation:
+            # if KhBefore == 0:
+            #     pNew = qVecNew[i]
+            # else:
+            pNew = calcForceFromPYCurve(xBefore, pyCurve)
+        else:
+            if KhBefore != 0:
+                if xBefore*qVecNew[i] < 0:
+                    pNew = qVecNew[i] + KhBefore*xBefore
+                else:
+                    pNew = qVecNew[i] - KhBefore*xBefore
+            else:
+                pNew = calcForceFromPYCurve(xBefore, pyCurve)
+
+        qVecNew[i] = pNew
+        KhNew = KhFromPYCurve(pNew, pyCurve, i)
+        KhList[checkNum] = KhNew
+        nodeForLoopNew[i]["Kh"] = KhNew
+    return {"qVec": qVecNew, "checkVec": checkVecNew, "nodeForLoop": nodeForLoopNew, "KhList": KhList}
+
+
+def solver(model, properties):
     numTotalNode = len(model["node"])
     numRealNode = len(model["node"]) - 4
 
@@ -128,10 +161,6 @@ def makeMatrix(model, properties):
     coeffVec = np.zeros(numTotalNode)
     forceVec = np.zeros(numTotalNode)
     dispVec = np.zeros(numTotalNode)
-
-    checkVec = []
-    for i in range(numRealNode):
-        checkVec.append(False)
 
     E = properties["pile"]["E"] * 1e3   # unit: kPa
     I = properties["pile"]["I"] * 1e-12  # unit: m^4
@@ -151,69 +180,39 @@ def makeMatrix(model, properties):
     kInverse = np.linalg.inv(kMatrix)
     dispVec = np.matmul(kInverse, forceVec)
 
+    checkVec = []
+    for i in range(numRealNode):
+        checkVec.append(False)
+
+    errMax = 0.1
+    KhList = np.zeros(numRealNode)
+    nodeForLoop = copy.deepcopy(model["node"])
+
+    obj = renewMatrix(model, numTotalNode, errMax,
+                      nodeForLoop, dispVec, checkVec, qVec)
+    checkVec = obj["checkVec"]
+    KhList = obj["KhList"]
+    
+    
     test = 0
-    dummyNodeInfo = copy.deepcopy(model["node"])
-    errMax = 0.01
-    khList = np.zeros(numRealNode)
-    while False in checkVec and test != 10001:
-    # while False in checkVec:
-
-        beforeDispVec = copy.deepcopy(dispVec)
-        for i in range(2, numTotalNode-2):
-            checkNum = i-2
-            sign = 1 if i%2==0 else -1
-            # if not checkVec[checkNum]:
-            isExcavation = model["node"][i]["isExcavation"]
-            pyCurve = model["pyCurve"][i]
-            Kh = dummyNodeInfo[i]["Kh"]
-            x = dispVec[i][0]
-            # pNew = calcForceFromPYCurve(x, pyCurve) if Kh!=0 else qVec[i]
-            # pNew = calcForceFromPYCurve(x, pyCurve)
-            if isExcavation:
-                if Kh == 0:
-                    pNew = qVec[i] - Kh*x
-                else:
-                    pNew = calcForceFromPYCurve(x, pyCurve)
-            else:
-                # if Kh != 0:
-                if x*qVec[i] < 0:
-                    pNew = qVec[i] - Kh*x
-                else:
-                    pNew = qVec[i] - Kh*x
-                # else:
-                #     pNew = calcForceFromPYCurve(x, pyCurve)
-
-            deff = qVec[i] - pNew
-            err = abs(deff) / abs(qVec[i])
-
-            check = err <= errMax
-            checkVec[checkNum] = check
-
-            # if i == 3:
-            #     print('----------------------------')
-            #     print(test)
-            #     print("pBefore:" ,qVec[i], "  ", "pAfter: ", pNew)
-
-            qVec[i] = pNew
-            forceVec[i][0] = qVec[i] * coeffVec[i]
-            Kh = KhFromPYCurve(pNew, pyCurve, i)
-            khList[checkNum] = Kh
-            dummyNodeInfo[i]["Kh"] = Kh
-
-            # if i==8:
-            #     print("kh ",Kh)
-            # if i == 3:
-            #     print('----------------------------')
-            #     print("uBefore:" ,dispVec[i][0], "  ", "uAfter: ", pNew)
-
-        kMatrix = stiffnessMatrix(dummyNodeInfo, EI)
+    while False in checkVec and test != 0:
+        nodeForLoop = obj["nodeForLoop"]
+        qVec = obj["qVec"]
+        forceVec = np.multiply(qVec,  coeffVec).reshape(numTotalNode, 1)
+        
+        kMatrix = stiffnessMatrix(nodeForLoop, EI)
         kInverse = np.linalg.inv(kMatrix)
         dispVec = np.matmul(kInverse, forceVec)
-        # print("uBefore:" ,beforeDispVec[3][0], "  ", "uAfter: ", dispVec[3][0])
 
+        obj = renewMatrix(model, numTotalNode, errMax,
+                      nodeForLoop, dispVec, checkVec, qVec)
+        checkVec = obj["checkVec"]
+        KhList = obj["KhList"]
+        
         test += 1
+
     print(test)
     print(checkVec[0:len(checkVec)-1])
-    print(khList)
+    # print(KhList)
 
     return {"qVec": qVec.reshape(1, numTotalNode), "dispVec": dispVec.reshape(1, numTotalNode)}
