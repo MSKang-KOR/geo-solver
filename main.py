@@ -7,10 +7,12 @@ import copy
 # from numpy.matrixlib.defmatrix import matrix
 
 import model
-import modelMM
+import modelAP
 import solver
 import solver2
 import solver3
+import solver4
+import solverAP
 # import solverMM
 
 
@@ -28,7 +30,7 @@ for node in modelObj["node"]:
     y.append(node["y"])
 xStan = np.zeros(len(y))
 dispExcel = np.ones(len(y)) * -1.75*1e-3
-matrixObj = solver3.solver(modelObj, properties)
+matrixObj = solver4.solver(modelObj, properties)
 
 
 disp = matrixObj["dispVec"][0]

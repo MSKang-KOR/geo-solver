@@ -113,56 +113,67 @@ def stiffnessMatrix(nodeInfo, EI):
     return kMatrix
 
 
-def renewMatrix(model, numTotalNode, errMax, nodeForLoop, dispVec, checkVec, qVec):
+def renewMatrix(model, numTotalNode, errMax, nodeForLoop, dispVec, checkVecB, checkVecE, p0BVec, p0EVec, qVec):
     KhList = np.zeros(numTotalNode-4)
+    p0BVecNew = copy.deepcopy(p0BVec)
+    p0EVecNew = copy.deepcopy(p0EVec)
     qVecNew = copy.deepcopy(qVec)
     nodeForLoopNew = copy.deepcopy(nodeForLoop)
-    checkVecNew = copy.deepcopy(checkVec)
+    checkVecBNew = copy.deepcopy(checkVecB)
+    checkVecENew = copy.deepcopy(checkVecE)
+    # print('here')
+    # print(p0BVecNew)
+    # print(p0EVecNew)
     # print(dispVec)
     for i in range(2, numTotalNode-2):
         checkNum = i-2
         isExcavation = model["node"][i]["isExcavation"]
-        pyCurve = model["pyCurve"][i]
+        pyCurveB = model["pyCurve"][i]["back"]
+        pyCurveE = model["pyCurve"][i]["excavation"]
         KhBefore = nodeForLoopNew[i]["Kh"]
         xBefore = dispVec[i][0]
-        pForCheck = calcForceFromPYCurve(xBefore, pyCurve)
-        deff = qVecNew[i] / pForCheck
-        err = 1 - deff
-        check = abs(err) <= errMax
-        checkVecNew[checkNum] = check
+        pForCheckB = calcForceFromPYCurve(xBefore, pyCurveB)
+        pForCheckE = calcForceFromPYCurve(xBefore, pyCurveE)
+        deffB = p0BVecNew[i] / pForCheckB
+        deffE = p0EVecNew[i] / pForCheckE
+        errB = 1 - abs(deffB)
+        errE = 1 - abs(deffE)
+        checkB = errB <= errMax
+        checkE = errE <= errMax
+        checkVecBNew[checkNum] = checkB
+        checkVecENew[checkNum] = checkE
 
-        pNew = qVecNew[i] - KhBefore*xBefore
+        pBNew = -p0BVecNew[i] + KhBefore*xBefore
+        pENew = p0EVecNew[i] + KhBefore*xBefore
+        if pBNew >= pyCurveB["pLim"][0]:
+            pBNew = pyCurveB["pLim"][0]
+        elif pBNew <= pyCurveB["pLim"][1]:
+            pBNew = pyCurveB["pLim"][1]
+        
+        if pENew >= pyCurveE["pLim"][0]:
+            pENew = pyCurveE["pLim"][0]
+        elif pENew <= pyCurveE["pLim"][1]:
+            pENew = pyCurveE["pLim"][1]
 
-        if pNew >= pyCurve["pLim"][0]:
-            pNew = pyCurve["pLim"][0]
-        elif pNew <= pyCurve["pLim"][1]:
-            pNew = pyCurve["pLim"][1]
-        # if check:
-        # if isExcavation:
-        #     # if KhBefore == 0:
-        #     #     pNew = qVecNew[i]
-        #     # else:
-        #     pNew = calcForceFromPYCurve(xBefore, pyCurve)
-        # else:
-        #     if KhBefore != 0:
-        #         if xBefore*qVecNew[i] < 0:
-        #             pNew = qVecNew[i] + KhBefore*xBefore
-        #         else:
-        #             pNew = qVecNew[i] - KhBefore*xBefore
-        #     else:
-        #         pNew = calcForceFromPYCurve(xBefore, pyCurve)
+        p0BVecNew[i] = pBNew
+        p0EVecNew[i] = pENew
 
-        qVecNew[i] = pNew
-        KhNew = KhFromPYCurve(pNew, pyCurve, i)
+        qVecNew[i] = -pBNew + pENew
+        KhB = KhFromPYCurve(-pBNew, pyCurveB, i)
+        KhE = KhFromPYCurve(-pENew, pyCurveE, i)
+        
+        KhNew = KhB + KhE
         KhList[checkNum] = KhNew
         nodeForLoopNew[i]["Kh"] = KhNew
-    return {"qVec": qVecNew, "checkVec": checkVecNew, "nodeForLoop": nodeForLoopNew, "KhList": KhList}
+    return {"p0BVec": p0BVecNew, "p0EVec": p0EVecNew, "qVec": qVecNew, "checkVecB": checkVecBNew, "checkVecE": checkVecENew, "nodeForLoop": nodeForLoopNew, "KhList": KhList}
 
 
 def solver(model, properties):
     numTotalNode = len(model["node"])
     numRealNode = len(model["node"]) - 4
 
+    p0BVec = np.zeros(numTotalNode)
+    p0EVec = np.zeros(numTotalNode)
     qVec = np.zeros(numTotalNode)
     coeffVec = np.zeros(numTotalNode)
     forceVec = np.zeros(numTotalNode)
@@ -176,8 +187,9 @@ def solver(model, properties):
 
     for i in range(numTotalNode):
         h = model["node"][i]["dh"]
-        qVec[i] = - model["pressure"]["backSide"]["rest"][i] + \
-            model["pressure"]["excavationSide"]["rest"][i]
+        p0BVec[i] = model["pressure"]["backSide"]["rest"][i]
+        p0EVec[i] = model["pressure"]["excavationSide"]["rest"][i]
+        qVec[i] = - p0BVec[i] + p0EVec[i]
         # qVec[i] = model["node"][i]["qTest"]
         coeffVec[i] = (h**4)
         forceVec[i] = qVec[i] * coeffVec[i]
@@ -186,40 +198,48 @@ def solver(model, properties):
     kInverse = np.linalg.inv(kMatrix)
     dispVec = np.matmul(kInverse, forceVec)
 
-    checkVec = []
+    checkVecB = []
+    checkVecE = []
     for i in range(numRealNode):
-        checkVec.append(False)
+        checkVecB.append(False)
+        checkVecE.append(False)
 
     errMax = 0.01
     KhList = np.zeros(numRealNode)
     nodeForLoop = copy.deepcopy(model["node"])
 
     obj = renewMatrix(model, numTotalNode, errMax,
-                      nodeForLoop, dispVec, checkVec, qVec)
-    checkVec = obj["checkVec"]
+                      nodeForLoop, dispVec, checkVecB, checkVecE, p0BVec, p0EVec, qVec)
+    checkVecB = obj["checkVecB"]
+    checkVecE = obj["checkVecE"]
     KhList = obj["KhList"]
-    
-    
+
     test = 0
-    # while False in checkVec and test != 101:
-    while False in checkVec and test != 100:
+    # print(False in checkVecB)
+    # print(False in checkVecE)
+    # print((False in checkVecB) and (False in checkVecE) and test != 51)
+    # while (False in checkVecB) and (False in checkVecE) and test != 51:
+    while test != 51:
         nodeForLoop = obj["nodeForLoop"]
         qVec = obj["qVec"]
         forceVec = np.multiply(qVec,  coeffVec).reshape(numTotalNode, 1)
-        
+
         kMatrix = stiffnessMatrix(nodeForLoop, EI)
         kInverse = np.linalg.inv(kMatrix)
         dispVec = np.matmul(kInverse, forceVec)
 
         obj = renewMatrix(model, numTotalNode, errMax,
-                      nodeForLoop, dispVec, checkVec, qVec)
-        checkVec = obj["checkVec"]
+                      nodeForLoop, dispVec, checkVecB, checkVecE, p0BVec, p0EVec, qVec)
+        checkVecB = obj["checkVecB"]
+        checkVecE = obj["checkVecE"]
         KhList = obj["KhList"]
-        
+
         test += 1
 
-    print(test)
-    print(checkVec[0:len(checkVec)-1])
-    print(KhList)
+    # print(test)
+    print(checkVecB)
+    print(checkVecE)
+    # print(KhList)
 
     return {"qVec": qVec.reshape(1, numTotalNode), "dispVec": dispVec.reshape(1, numTotalNode)}
+

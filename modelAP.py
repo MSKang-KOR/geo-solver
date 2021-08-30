@@ -14,13 +14,15 @@ def makeModelObj(layers, q=0, gammaW=10):
     qUpperSoil1 = 0
     qUpperSoil2 = 0
     nodeNum = 3
-    dhInit = 10
-    qTestList = [[-8, -10.5],[-10.5,-13],[-13,-1],[19,1],[1,-2],[-2,0]]
+    dhInit = 0.01
+    dhInit = 0.1
+    qTestList = [[-8, -10.5], [-10.5, -13],
+                 [-13, -1], [19, 1], [1, -2], [-2, 0]]
     # qTestList = [[0,-3.61],[7.6,2.0],[7.6,0],[0,-2],[-2,1.5],[1.5,-3.2]]
     for i in range(len(layers)):
         layer = layers[i]
-        h1 = layer["h1"]
-        h2 = layer["h2"]
+        h1 = layer["h1"]/1e3
+        h2 = layer["h2"]/1e3
         Hlayer = abs(h2 - h1)   # unit: m
         mTest = (qTestList[i][1] - qTestList[i][0])/(h2 - h1)
         coeffTest = [mTest, qTestList[i][0] - mTest*h1]
@@ -35,20 +37,20 @@ def makeModelObj(layers, q=0, gammaW=10):
         Ka = (1 - math.sin(phi)) / (1 + math.sin(phi))
         Kp = 1 / Ka
 
-        Kh = layer["Kh"]    # unit: kN/m3
         numEle = round(Hlayer/dhInit)
         dh = Hlayer/numEle
+        Kh = layer["Kh"]    # unit: kN/m3
         # kh = Kh if not layer["isExcavation"] else 0  # unit: kN/m2
-        kh = Kh
+        kh = Kh*dh
 
         if i == 0:
             result["node"].append(
-                {"number": 1, "y": h1 + dh*2, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "qTest":0})
+                {"number": 1, "y": h1 + dh*2, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "qTest": 0})
             result["node"].append(
-                {"number": 2, "y": h1 + dh*1, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "qTest":0})
+                {"number": 2, "y": h1 + dh*1, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "qTest": 0})
             for j in range(2):
-                result["pyCurve"].append(
-                    {"coeff": [[0, 0]], "xLim": [0, 0], "pLim": [0, 0]})
+                result["pyCurve"].append({"back": {"coeff": [[0,0]], "xLim": [0,0], "pLim": [0,0]},
+                                      "excavation": {"coeff": [[0,0]], "xLim": [0,0], "pLim": [0,0]}})
                 for loca in ["backSide", "excavationSide"]:
                     for type in ["rest", "active", "passive"]:
                         result["pressure"][loca][type].append(0)
@@ -65,20 +67,19 @@ def makeModelObj(layers, q=0, gammaW=10):
             h = abs(h1-y)
             qTest = coeffTest[0] * y + coeffTest[1]
             result["node"].append(
-                {"number": nodeNum, "y": y, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "qTest":qTest})
+                {"number": nodeNum, "y": y, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "qTest": qTest})
 
             # 배면측 정지, 주동, 수동 토압
-            p01 = K0 * (q + qUpperSoil1 + gamma*h) - 2 * c * math.sqrt(K0)
+            p01 = K0 * (q + qUpperSoil1 + gamma*h)
             pa1 = Ka * (q + qUpperSoil1 + gamma*h) - 2 * c * math.sqrt(Ka)
             pa1 = 0 if pa1 < 0 else pa1
             pp1 = Kp * (q + qUpperSoil1 + gamma*h) + 2 * c * math.sqrt(Kp)
             # 굴착측 정지, 주동, 수동 토압
-            # p02 = K0 * (qUpperSoil2 + gamma * h) - 2 * c * \
-            #     math.sqrt(K0)if not layer["isExcavation"] else 0
-            p02 = 0
-            # p02 = 0 if p02 < 0 else p02
-            pa2 = Ka * (qUpperSoil2 + gamma*h) - 2 * c * \
-                math.sqrt(Ka) if not layer["isExcavation"] else 0
+            p02 = K0 * (qUpperSoil2 + gamma *
+                        h) if not layer["isExcavation"] else 0
+            # p02 = 0
+            pa2 = Ka * (qUpperSoil2 + gamma *
+                        h) if not layer["isExcavation"] else 0
             pa2 = 0 if pa2 < 0 else pa2
             pp2 = Kp * (qUpperSoil2 + gamma*h) + 2 * c * \
                 math.sqrt(Kp) if not layer["isExcavation"] else 0
@@ -90,31 +91,33 @@ def makeModelObj(layers, q=0, gammaW=10):
             result["pressure"]["excavationSide"]["active"].append(pa2)
             result["pressure"]["excavationSide"]["passive"].append(pp2)
 
-            p01 = p01 * dh
-            pa1 = pa1 * dh
-            pp1 = pp1 * dh
-            p02 = p02 * dh
-            pa2 = pa2 * dh
-            pp2 = pp2 * dh
-            if layer["isExcavation"]:
-                xa = -(-pa1+p01)/Kh
-                xp = -(-pp1+p01)/Kh
-                coeff = [[-Kh, -p01]]  # p-y curve 1차 방정식 계수
-                xLim = [xa, xp]
-                pLim = [-pa1, -pp1]
-            else:
-                pl = pp2 - pa1
-                pr = pa2 - pp1
-                xa1 = -(-pa1+p01)/Kh
-                xp1 = -(-pp1+p01)/Kh
-                xa2 = -(pa2-p02)/Kh
-                xp2 = -(pp2-p02)/Kh
-                coeff = [[-Kh, p02-pa1], [-2*Kh, p02-p01], [-Kh, -p01+pa2]]
-                xLim = [xp2, xa1, xa2, xp1]
-                pLim = [pl, -2*pa1+p01+p02,  2*pa2-p01-p02, pr]
+            coeff1 = [[-Kh, -p01]]
+            xLim1 = [(pa1-p01)/Kh, (pp1-p01)/Kh]
+            pLim1 = [-pa1, -pp1]
 
-            result["pyCurve"].append(
-                {"coeff": coeff, "xLim": xLim, "pLim": pLim})
+            coeff2 = [[-Kh, p02]]
+            xLim2 = [-(pa2-p02)/Kh, -(pp2-p02)/Kh]
+            pLim2 = [pp2, pa2]
+
+            # if layer["isExcavation"]:
+            #     xa = -(-pa1+p01)/Kh
+            # xp = -(-pp1+p01)/Kh
+            # coeff = [[-Kh, -p01]]  # p-y curve 1차 방정식 계수
+            # xLim = [xa, xp]
+            # pLim = [-pa1, -pp1]
+            # else:
+            #     pl = pp2 - pa1
+            #     pr = pa2 - pp1
+            #     xa1 = -(-pa1+p01)/Kh
+            #     xp1 = -(-pp1+p01)/Kh
+            #     xa2 = -(pa2-p02)/Kh
+            #     xp2 = -(pp2-p02)/Kh
+            #     coeff = [[-Kh, p02-pa1], [-2*Kh, p02-p01], [-Kh, -p01+pa2]]
+            #     xLim = [xp2, xa1, xa2, xp1]
+            #     pLim = [pl, -2*pa1+p01+p02,  2*pa2-p01-p02, pr]
+
+            result["pyCurve"].append({"back": {"coeff": coeff1, "xLim": [0,0], "pLim": [0,0]},
+                                      "excavation": {"coeff": coeff2, "xLim": [0,0], "pLim": [0,0]}})
 
             nodeNum += num
 
@@ -123,17 +126,17 @@ def makeModelObj(layers, q=0, gammaW=10):
 
         if i == len(layers)-1:
             result["node"].append(
-                {"number": nodeNum, "y": h2 - dh*1, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "qTest":qTest})
+                {"number": nodeNum, "y": h2 - dh*1, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "qTest": qTest})
             result["node"].append(
-                {"number": nodeNum+1, "y": h2 - dh*2, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "qTest":qTest})
+                {"number": nodeNum+1, "y": h2 - dh*2, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "qTest": qTest})
             for j in range(2):
-                result["pyCurve"].append(
-                    {"coeff": coeff, "xLim": xLim, "pLim": pLim})
-                result["pressure"]["backSide"]["rest"].append(p01)
-                result["pressure"]["backSide"]["active"].append(pa1)
-                result["pressure"]["backSide"]["passive"].append(pp1)
-                result["pressure"]["excavationSide"]["rest"].append(p02)
-                result["pressure"]["excavationSide"]["active"].append(pa2)
-                result["pressure"]["excavationSide"]["passive"].append(pp2)
+                result["pyCurve"].append({"back": {"coeff": [[0,0]], "xLim": xLim1, "pLim": pLim1},
+                                      "excavation": {"coeff": [[0,0]], "xLim": xLim2, "pLim": pLim2}})
+                result["pressure"]["backSide"]["rest"].append(0)
+                result["pressure"]["backSide"]["active"].append(0)
+                result["pressure"]["backSide"]["passive"].append(0)
+                result["pressure"]["excavationSide"]["rest"].append(0)
+                result["pressure"]["excavationSide"]["active"].append(0)
+                result["pressure"]["excavationSide"]["passive"].append(0)
 
     return result
