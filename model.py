@@ -23,6 +23,7 @@ def makeModelObj(layers, q=0, gammaW=10):
         layer = layers[i]
         h1 = layer["h1"]/1e3
         h2 = layer["h2"]/1e3
+        hw = 0
         Hlayer = abs(h2 - h1)   # unit: m
         mTest = (qTestList[i][1] - qTestList[i][0])/(h2 - h1)
         coeffTest = [mTest, qTestList[i][0] - mTest*h1]
@@ -71,7 +72,8 @@ def makeModelObj(layers, q=0, gammaW=10):
 
             # 배면측 정지, 주동, 수동 토압
             p01 = K0 * (q + qUpperSoil1 + gamma*h) - 2 * c * math.sqrt(K0)
-            pa1 = Ka * (q + qUpperSoil1 + gamma*h) - 2 * c * math.sqrt(Ka)
+            pa1 = Ka * (q + qUpperSoil1 + gamma*h) - 2 * c * \
+                math.sqrt(Ka)+(gammaW * hw)
             pa1 = 0 if pa1 < 0 else pa1
             pp1 = Kp * (q + qUpperSoil1 + gamma*h) + 2 * c * math.sqrt(Kp)
 
@@ -82,7 +84,7 @@ def makeModelObj(layers, q=0, gammaW=10):
             # p02 = 0 if p02 < 0 else p02
 
             pa2 = -(Ka * (qUpperSoil2 + gamma*h) - 2 * c *
-                    math.sqrt(Ka)) if not layer["isExcavation"] else 0
+                    math.sqrt(Ka)+(gammaW * hw)) if not layer["isExcavation"] else 0
 
             pa2 = 0 if pa2 > 0 else pa2
             pp2 = -(Kp * (qUpperSoil2 + gamma*h) + 2 * c *
@@ -135,6 +137,7 @@ def makeModelObj(layers, q=0, gammaW=10):
             nodeNum += num
         qUpperSoil1 += gamma * Hlayer
         qUpperSoil2 += gamma * Hlayer if not layer["isExcavation"] else 0
+        hw += Hlayer if layer["isWater"] else 0
 
         if i == len(layers)-1:
             result["node"].append(

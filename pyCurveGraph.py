@@ -15,7 +15,7 @@ properties = {"pile": {"E":210*1e3, "I":226000000, "A":19100}}
 
 # Hem = 6.9
 modelObj = model.makeModelObj(layers,15)
-pyCurve = modelObj["pyCurve"][20]
+pyCurve = modelObj["pyCurve"][60]
 print(pyCurve)
 print(pyCurve["coeff"])
 print(len(pyCurve["coeff"])==1)

@@ -37,57 +37,69 @@ def calcForceFromPYCurve(x, pyCurve):
     xLim = pyCurve["xLim"]
     pLim = pyCurve["pLim"]
     if len(coeff) == 1:
-        if x <= xLim[0]:
+        if x < xLim[0]:
             p = pLim[0]
-        elif x >= xLim[1]:
+            Kh = 0
+        elif x > xLim[1]:
             p = pLim[1]
+            Kh = 0
         else:
             p = (coeff[0][0]*x + coeff[0][1])
+            Kh = coeff[0][0]
         # print(coeff)
     else:
-        if x <= xLim[0]:
+        if x < xLim[0]:
             p = pLim[0]
-        elif xLim[0] < x and x < xLim[1]:
+            Kh = 0
+        elif xLim[0] <= x and x < xLim[1]:
             index = 0
             p = (coeff[index][0]*x + coeff[index][1])
+            Kh = coeff[index][0]
         elif xLim[1] < x and x < xLim[2]:
             index = 1
             p = (coeff[index][0]*x + coeff[index][1])
-        elif xLim[2] < x and x < xLim[3]:
+            Kh = coeff[index][0]
+        elif xLim[2] < x and x <= xLim[3]:
             index = 2
             p = (coeff[index][0]*x + coeff[index][1])
-        elif x >= xLim[3]:
+            Kh = coeff[index][0]
+        elif x > xLim[3]:
             p = pLim[3]
-        else:
-            print("error")
-
-    return p
-
-
-def KhFromPYCurve(p, pyCurve, i):
-    coeff = pyCurve["coeff"]
-    xLim = pyCurve["xLim"]
-    pLim = pyCurve["pLim"]
-
-    if len(coeff) == 1:
-        Kh = 0 if p >= pLim[0] or pLim[1] >= p else coeff[0][0]
-        testNum = 0
-    else:
-        if p <= pLim[3] or p >= pLim[0]:
             Kh = 0
-            testNum = 1
-        elif pLim[3] < p and p < pLim[2]:
-            Kh = coeff[2][0]
-            testNum = 2
-        elif pLim[2] < p and p < pLim[1]:
-            Kh = coeff[1][0]
-            testNum = 3
-        elif pLim[1] < p and p < pLim[0]:
-            Kh = coeff[0][0]
-            testNum = 4
         else:
             print("error")
-    return Kh
+            raise IndexError()
+
+    return p, Kh
+
+# 동일 할때는 kh가 0이 아님. limit을 넘어갈때만 0?
+
+
+# def KhFromPYCurve(p, pyCurve, i):
+#     coeff = pyCurve["coeff"]
+#     xLim = pyCurve["xLim"]
+#     pLim = pyCurve["pLim"]
+
+#     if len(coeff) == 1:
+#         Kh = 0 if p > pLim[0] or pLim[1] > p else coeff[0][0]
+#         testNum = 0
+#     else:
+#         if p < pLim[3] or p > pLim[0]:
+#             Kh = 0
+#             testNum = 1
+#         elif pLim[3] <= p and p < pLim[2]:
+#             Kh = coeff[2][0]
+#             testNum = 2
+#         elif pLim[2] < p and p < pLim[1]:
+#             Kh = coeff[1][0]
+#             testNum = 3
+#         elif pLim[1] < p and p <= pLim[0]:
+#             Kh = coeff[0][0]
+#             testNum = 4
+#         else:
+#             print("error")
+#             raise IndexError()
+#     return Kh
 
 
 def stiffnessMatrix(nodeInfo, EI):
@@ -108,7 +120,7 @@ def stiffnessMatrix(nodeInfo, EI):
             q = 0
         else:
             a = np.zeros(i-2)
-            alpha = 6 + Kh * (h**4)/EI
+            alpha = 6 + abs(Kh) * (h**4)/EI
             b = np.array([1, -4, alpha, -4, 1])
             c = np.append(a, b)
             d = np.zeros(length - len(a) - len(b))
@@ -130,8 +142,8 @@ def renewMatrix(model, EI, numTotalNode, errMax, nodeForLoopBefore, dispVecBefor
         isExcavation = model["node"][i]["isExcavation"]
         pyCurve = model["pyCurve"][i]
         xBefore = dispVecBefore[i][0]
-        pForCheck = calcForceFromPYCurve(xBefore, pyCurve)
-        KhForCheck = KhFromPYCurve(pForCheck, pyCurve, i)
+        pForCheck, KhForCheck = calcForceFromPYCurve(xBefore, pyCurve)
+        # KhForCheck = KhFromPYCurve(pForCheck, pyCurve, i)
         nodeForLoopNew[i]["Kh"] = KhForCheck
         qVecIN[i] = pForCheck
 
@@ -147,14 +159,14 @@ def renewMatrix(model, EI, numTotalNode, errMax, nodeForLoopBefore, dispVecBefor
         err = dispVecBefore[i][0] - dispVecNew[i][0]
         check = abs(err) <= errMax
         checkVec[checkNum] = check
-        if i == 20:
-            print("xBefore: ", dispVecBefore[i][0],
-                  " ", "xAfter: ", dispVecNew[i][0])
-            print("err: ", err)
-            print("chekc: ", check)
+        # if i == 60:
+        #     print("xBefore: ", dispVecBefore[i][0],
+        #           " ", "xAfter: ", dispVecNew[i][0])
+        #     print("err: ", err)
+        #     print("chekc: ", check)
 
-        qVecNew[i] = calcForceFromPYCurve(dispVecBefore[i][0], pyCurve)
-        # qVecNew[i] = qVecBefore[i] - nodeForLoopBefore[i]["Kh"]*dispVecBefore[i][0]
+        qVecNew[i], KhNew = calcForceFromPYCurve(dispVecBefore[i][0], pyCurve)
+        # qVecNew[i] = qVecBefore[i] - nodeForLoopBefore[i]["Kh"]*(dispVecBefore[i][0])
         # if len(pyCurve["pLim"]) == 2:
         #     if qVecNew[i] > pyCurve["pLim"][0]:
         #         qVecNew[i] = pyCurve["pLim"][0]
@@ -167,16 +179,16 @@ def renewMatrix(model, EI, numTotalNode, errMax, nodeForLoopBefore, dispVecBefor
         #         # KhNew = 0
         #     elif qVecNew[i] < pyCurve["pLim"][3]:
         #         qVecNew[i] = pyCurve["pLim"][3]
-        # KhNew = 0
-        KhNew = KhFromPYCurve(qVecNew[i], pyCurve, i)
+        # # KhNew = 0
+        # KhNew = KhFromPYCurve(qVecNew[i], pyCurve, i)
 
         nodeForLoopNew[i]["Kh"] = KhNew
-        if i == 20:
-            print("qVecNew: ", qVecNew[i])
-            print("KhNew: ", KhNew)
-            print("pLim: ", pyCurve["pLim"])
-            print("xLim: ", pyCurve["xLim"])
-            print("-------------------")
+        # if i == 60:
+        #     print("qVecNew: ", qVecNew[i], "  qVecBefore: ", qVecBefore[i])
+        #     print("KhNew: ", KhNew)
+        #     print("pLim: ", pyCurve["pLim"])
+        #     print("xLim: ", pyCurve["xLim"])
+        #     print("-------------------")
         # # KhList[i] = KhNew
     return {"checkVec": checkVec, "qVec": qVecNew, "nodeForLoop": nodeForLoopNew}
 
@@ -200,7 +212,7 @@ def solver(model, properties):
 
     for i in range(numTotalNode):
         h = model["node"][i]["dh"]
-        qVec[i] = - model["pressure"]["backSide"]["rest"][i] - \
+        qVec[i] = model["pressure"]["backSide"]["rest"][i] + \
             model["pressure"]["excavationSide"]["rest"][i]
         # qVec[i] = model["node"][i]["qTest"]
         coeffVec[i] = (h**4)
@@ -210,19 +222,21 @@ def solver(model, properties):
     kInverse = np.linalg.inv(kMatrix)
     dispVec = np.matmul(kInverse, forceVec)
 
-    errMax = 0.0001
+    errMax = 0.001
     obj = renewMatrix(model, EI, numTotalNode, errMax,
                       nodeForLoop, dispVec, qVec, coeffVec)
     checkVec = obj["checkVec"]
 
     test = 0
-    while False in checkVec and test != 99:
+    while False in checkVec and test != 17:
+        # print("here")
         nodeForLoop = obj["nodeForLoop"]
         qVec = obj["qVec"]
         forceVec = np.multiply(qVec,  coeffVec).reshape(numTotalNode, 1)
 
         kMatrix = stiffnessMatrix(nodeForLoop, EI)
         kInverse = np.linalg.inv(kMatrix)
+        beforeDispVec = copy.deepcopy(dispVec)
         dispVec = np.matmul(kInverse, forceVec)
 
         obj = renewMatrix(model, EI, numTotalNode, errMax,
@@ -234,4 +248,35 @@ def solver(model, properties):
     # print(test)
     print(checkVec)
 
-    return {"qVec": qVec.reshape(1, numTotalNode), "dispVec": dispVec.reshape(1, numTotalNode)}
+    return {"qVec": qVec.reshape(1, numTotalNode), "dispVec": dispVec.reshape(1, numTotalNode), "beforeDispVec": beforeDispVec.reshape(1, numTotalNode)}
+
+
+def passive_active(model, properties):
+    numTotalNode = len(model["node"])
+
+    qVec = np.zeros(numTotalNode)
+    qVec2 = np.zeros(numTotalNode)
+    qVec3 = np.zeros(numTotalNode)
+    qVec4 = np.zeros(numTotalNode)
+    qVec5 = np.zeros(numTotalNode)
+    qVec6 = np.zeros(numTotalNode)
+
+    for i in range(numTotalNode):
+        qVec[i] = model["pressure"]["backSide"]["rest"][i] + \
+            model["pressure"]["excavationSide"]["rest"][i]
+        qVec2[i] = model["pressure"]["excavationSide"]["rest"][i]
+        qVec3[i] = model["pressure"]["backSide"]["active"][i] + \
+            model["pressure"]["excavationSide"]["passive"][i]
+        qVec4[i] = model["pressure"]["excavationSide"]["active"][i]
+        qVec5[i] = model["pressure"]["backSide"]["passive"][i] + \
+            model["pressure"]["excavationSide"]["active"][i]
+        qVec6[i] = model["pressure"]["excavationSide"]["passive"][i]
+
+    return {
+        "qVec": qVec.reshape(1, numTotalNode),
+        "qVec2": qVec2.reshape(1, numTotalNode),
+        "qVec3": qVec3.reshape(1, numTotalNode),
+        "qVec4": qVec4.reshape(1, numTotalNode),
+        "qVec5": qVec5.reshape(1, numTotalNode),
+        "qVec6": qVec6.reshape(1, numTotalNode)
+    }
