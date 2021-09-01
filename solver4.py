@@ -131,7 +131,7 @@ def stiffnessMatrix(nodeInfo, EI):
 
 
 def calcStiffnessMat(modelProperties, forceMatrix, beforeDispMatrix, checkMatrix, node_len, EI, qVec):
-    errMax = 0.0001
+    errMax = 0.001
 
     kMatrix = stiffnessMatrix(modelProperties["node"], EI)
     forceVec = forceMatrix.reshape(node_len, 1)
@@ -139,31 +139,39 @@ def calcStiffnessMat(modelProperties, forceMatrix, beforeDispMatrix, checkMatrix
 
     dispVec = np.matmul(kInverse, forceVec)
 
-    breakPoint = False
-
     for i in range(2, node_len-2):
-        if not checkMatrix[i-2] or breakPoint:
-            # pyCurve = modelProperties["pyCurve"][i]
-            # P_prime, _ = calcForceFromPYCurve(dispVec[i], pyCurve)
-            # err = abs(P_prime-qVec[i])
-            err = abs(beforeDispMatrix[i]-dispVec[i])
-            checkMatrix[i-2] = (err < errMax)
-            breakPoint = True
+        # pyCurve = modelProperties["pyCurve"][i]
+        # P_prime, _ = calcForceFromPYCurve(dispVec[i], pyCurve)
+        # err = abs(P_prime-qVec[i])
+        err = abs(beforeDispMatrix[i]-dispVec[i])
+        checkMatrix[i-2] = (err < errMax)
 
     return dispVec, checkMatrix
 
 
-def modProperties(modelProperties, numTotalNode, dispVec, coeffVec, checkVec, qVecIN, useP0=False):
+def modProperties(modelProperties, numTotalNode, dispVec, coeffVec, checkVec, qVecIN, p0Vec, useP0=False):
     # qVecIN = np.zeros(numTotalNode)
-    breakPoint = False
+
     for i in range(2, numTotalNode-2):
-        if not checkVec[i-2] or breakPoint:
-            pyCurve = modelProperties["pyCurve"][i]
-            xBefore = dispVec[i][0]
-            P_prime, Kh = calcForceFromPYCurve(xBefore, pyCurve)
-            modelProperties["node"][i]["Kh"] = Kh
-            qVecIN[i] = P_prime
-            breakPoint = True
+
+        pyCurve = modelProperties["pyCurve"][i]
+        xBefore = dispVec[i][0]
+        _, Kh = calcForceFromPYCurve(xBefore, pyCurve)
+        modelProperties["node"][i]["Kh"] = Kh
+        qVecIN[i]  -= Kh*abs(xBefore)
+        if len(pyCurve["pLim"]) == 2:
+            if qVecIN[i] > pyCurve["pLim"][0]:
+                qVecIN[i] = pyCurve["pLim"][0]
+                # KhNew = 0
+            elif qVecIN[i] < pyCurve["pLim"][1]:
+                qVecIN[i] = pyCurve["pLim"][1]
+        else:
+            if qVecIN[i] > pyCurve["pLim"][0]:
+                qVecIN[i] = pyCurve["pLim"][0]
+                # KhNew = 0
+            elif qVecIN[i] < pyCurve["pLim"][3]:
+                qVecIN[i] = pyCurve["pLim"][3]
+
     forceVec = np.multiply(qVecIN,  coeffVec).reshape(numTotalNode, 1)
     return modelProperties, forceVec, qVecIN
 
@@ -235,16 +243,16 @@ def solver(model_immutable, properties):
     forceVec = forceVec.reshape(numTotalNode, 1)
     dispVec, checkVec = calcStiffnessMat(
         model, forceVec, dispVec, checkVec, numTotalNode, EI, qVec)
-
+    p0Vec = copy.deepcopy(qVec)
     test = 0
-    while False in checkVec and test !=25:
+    while False in checkVec and test != 30:
         # print("here")
         model, forceVec, qVec = modProperties(
-            model, numTotalNode, dispVec, coeffVec, checkVec, copy.deepcopy(qVec))
+            model, numTotalNode, dispVec, coeffVec, checkVec, copy.deepcopy(qVec), p0Vec)
 
         beforeDispVec = copy.deepcopy(dispVec)
         dispVec, checkVec = calcStiffnessMat(
-            model, forceVec, dispVec, checkVec, numTotalNode, EI, qVec)
+            model, forceVec, beforeDispVec, checkVec, numTotalNode, EI, qVec)
 
         test += 1
         # print(test)
