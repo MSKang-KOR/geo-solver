@@ -16,7 +16,7 @@ import solverAP
 # import solverMM
 
 
-with open('layers.json', 'rt', encoding='UTF8') as json_file:
+with open('layers2.json', 'rt', encoding='UTF8') as json_file:
     layers = json.load(json_file)
 
 properties = {"pile": {"E": 210*1e3, "I": 226000000, "A": 19100}}
@@ -56,9 +56,9 @@ dispLim = 0.00175*1.5 if dispLim <= 0.00175 else dispLim
 
 fig, ax = plt.subplots(2)
 ax[0].plot(xStan, y, label='$pile$')
-ax[0].plot(q_0, y, label='$p_0$')
-ax[0].plot(q_active, y, label='$p_a$')
-ax[0].plot(q_passive, y, label='$p_p$')
+# ax[0].plot(q_0, y, label='$p_0$')
+# ax[0].plot(q_active, y, label='$p_a$')
+# ax[0].plot(q_passive, y, label='$p_p$')
 ax[0].plot(q, y, label='$pressure$')
 # ax[0].plot(q_0_excav, y, label='$p_0excav$')
 # ax[0].plot(q_active_excav, y, label='$p_a excav$')
