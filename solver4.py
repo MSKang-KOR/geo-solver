@@ -70,7 +70,7 @@ def calcForceFromPYCurve(x, pyCurve):
             print("error")
             raise IndexError()
 
-    return p, Kh
+    return p, abs(Kh)
 
 # 동일 할때는 kh가 0이 아님. limit을 넘어갈때만 0?
 
@@ -120,7 +120,7 @@ def stiffnessMatrix(nodeInfo, EI):
             q = 0
         else:
             a = np.zeros(i-2)
-            alpha = 6 + abs(Kh) * (h**4)/EI
+            alpha = 6 + (Kh) * (h**4)/EI
             b = np.array([1, -4, alpha, -4, 1])
             c = np.append(a, b)
             d = np.zeros(length - len(a) - len(b))
@@ -128,6 +128,44 @@ def stiffnessMatrix(nodeInfo, EI):
 
         kMatrix[i, :] = Ki * EI
     return kMatrix
+
+
+def calcStiffnessMat(modelProperties, forceMatrix, beforeDispMatrix, checkMatrix, node_len, EI, qVec):
+    errMax = 0.0001
+
+    kMatrix = stiffnessMatrix(modelProperties["node"], EI)
+    forceVec = forceMatrix.reshape(node_len, 1)
+    kInverse = np.linalg.inv(kMatrix)
+
+    dispVec = np.matmul(kInverse, forceVec)
+
+    breakPoint = False
+
+    for i in range(2, node_len-2):
+        if not checkMatrix[i-2] or breakPoint:
+            # pyCurve = modelProperties["pyCurve"][i]
+            # P_prime, _ = calcForceFromPYCurve(dispVec[i], pyCurve)
+            # err = abs(P_prime-qVec[i])
+            err = abs(beforeDispMatrix[i]-dispVec[i])
+            checkMatrix[i-2] = (err < errMax)
+            breakPoint = True
+
+    return dispVec, checkMatrix
+
+
+def modProperties(modelProperties, numTotalNode, dispVec, coeffVec, checkVec, qVecIN, useP0=False):
+    # qVecIN = np.zeros(numTotalNode)
+    breakPoint = False
+    for i in range(2, numTotalNode-2):
+        if not checkVec[i-2] or breakPoint:
+            pyCurve = modelProperties["pyCurve"][i]
+            xBefore = dispVec[i][0]
+            P_prime, Kh = calcForceFromPYCurve(xBefore, pyCurve)
+            modelProperties["node"][i]["Kh"] = Kh
+            qVecIN[i] = P_prime
+            breakPoint = True
+    forceVec = np.multiply(qVecIN,  coeffVec).reshape(numTotalNode, 1)
+    return modelProperties, forceVec, qVecIN
 
 
 def renewMatrix(model, EI, numTotalNode, errMax, nodeForLoopBefore, dispVecBefore, qVecBefore, coeffVec):
@@ -159,57 +197,32 @@ def renewMatrix(model, EI, numTotalNode, errMax, nodeForLoopBefore, dispVecBefor
         err = dispVecBefore[i][0] - dispVecNew[i][0]
         check = abs(err) <= errMax
         checkVec[checkNum] = check
-        # if i == 60:
-        #     print("xBefore: ", dispVecBefore[i][0],
-        #           " ", "xAfter: ", dispVecNew[i][0])
-        #     print("err: ", err)
-        #     print("chekc: ", check)
-
         qVecNew[i], KhNew = calcForceFromPYCurve(dispVecBefore[i][0], pyCurve)
-        # qVecNew[i] = qVecBefore[i] - nodeForLoopBefore[i]["Kh"]*(dispVecBefore[i][0])
-        # if len(pyCurve["pLim"]) == 2:
-        #     if qVecNew[i] > pyCurve["pLim"][0]:
-        #         qVecNew[i] = pyCurve["pLim"][0]
-        #         # KhNew = 0
-        #     elif qVecNew[i] < pyCurve["pLim"][1]:
-        #         qVecNew[i] = pyCurve["pLim"][1]
-        # else:
-        #     if qVecNew[i] > pyCurve["pLim"][0]:
-        #         qVecNew[i] = pyCurve["pLim"][0]
-        #         # KhNew = 0
-        #     elif qVecNew[i] < pyCurve["pLim"][3]:
-        #         qVecNew[i] = pyCurve["pLim"][3]
-        # # KhNew = 0
-        # KhNew = KhFromPYCurve(qVecNew[i], pyCurve, i)
 
         nodeForLoopNew[i]["Kh"] = KhNew
-        # if i == 60:
-        #     print("qVecNew: ", qVecNew[i], "  qVecBefore: ", qVecBefore[i])
-        #     print("KhNew: ", KhNew)
-        #     print("pLim: ", pyCurve["pLim"])
-        #     print("xLim: ", pyCurve["xLim"])
-        #     print("-------------------")
-        # # KhList[i] = KhNew
+
     return {"checkVec": checkVec, "qVec": qVecNew, "nodeForLoop": nodeForLoopNew}
 
 
-def solver(model, properties):
-    numTotalNode = len(model["node"])
-    numRealNode = len(model["node"]) - 4
+def solver(model_immutable, properties):
+    numTotalNode = len(model_immutable["node"])
+    numRealNode = len(model_immutable["node"]) - 4
 
     qVec = np.zeros(numTotalNode)
-    nodeForLoop = copy.deepcopy(model["node"])
+    model = copy.deepcopy(model_immutable)
     coeffVec = np.zeros(numTotalNode)
     forceVec = np.zeros(numTotalNode)
     dispVec = np.zeros(numTotalNode)
     KhList = np.zeros(numRealNode)
+    checkVec = np.zeros(numRealNode)
+
+    errMax = 0.001
 
     E = properties["pile"]["E"] * 1e3   # unit: kPa
     I = properties["pile"]["I"] * 1e-12  # unit: m^4
     EI = E*I
 
-    kMatrix = stiffnessMatrix(model["node"], EI)
-
+    # setup qVec, forceVec and coeffVec
     for i in range(numTotalNode):
         h = model["node"][i]["dh"]
         qVec[i] = model["pressure"]["backSide"]["rest"][i] + \
@@ -218,30 +231,21 @@ def solver(model, properties):
         coeffVec[i] = (h**4)
         forceVec[i] = qVec[i] * coeffVec[i]
 
+    beforeDispVec = copy.deepcopy(dispVec)
     forceVec = forceVec.reshape(numTotalNode, 1)
-    kInverse = np.linalg.inv(kMatrix)
-    dispVec = np.matmul(kInverse, forceVec)
-
-    errMax = 0.001
-    obj = renewMatrix(model, EI, numTotalNode, errMax,
-                      nodeForLoop, dispVec, qVec, coeffVec)
-    checkVec = obj["checkVec"]
+    dispVec, checkVec = calcStiffnessMat(
+        model, forceVec, dispVec, checkVec, numTotalNode, EI, qVec)
 
     test = 0
-    while False in checkVec and test != 17:
+    while False in checkVec and test !=25:
         # print("here")
-        nodeForLoop = obj["nodeForLoop"]
-        qVec = obj["qVec"]
-        forceVec = np.multiply(qVec,  coeffVec).reshape(numTotalNode, 1)
+        model, forceVec, qVec = modProperties(
+            model, numTotalNode, dispVec, coeffVec, checkVec, copy.deepcopy(qVec))
 
-        kMatrix = stiffnessMatrix(nodeForLoop, EI)
-        kInverse = np.linalg.inv(kMatrix)
         beforeDispVec = copy.deepcopy(dispVec)
-        dispVec = np.matmul(kInverse, forceVec)
+        dispVec, checkVec = calcStiffnessMat(
+            model, forceVec, dispVec, checkVec, numTotalNode, EI, qVec)
 
-        obj = renewMatrix(model, EI, numTotalNode, errMax,
-                          nodeForLoop, dispVec, qVec, coeffVec)
-        checkVec = obj["checkVec"]
         test += 1
         # print(test)
 

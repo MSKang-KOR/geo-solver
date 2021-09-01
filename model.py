@@ -72,8 +72,7 @@ def makeModelObj(layers, q=0, gammaW=10):
 
             # 배면측 정지, 주동, 수동 토압
             p01 = K0 * (q + qUpperSoil1 + gamma*h) - 2 * c * math.sqrt(K0)
-            pa1 = Ka * (q + qUpperSoil1 + gamma*h) - 2 * c * \
-                math.sqrt(Ka)+(gammaW * hw)
+            pa1 = Ka * (q + qUpperSoil1 + gamma*h) - 2 * c * math.sqrt(Ka)
             pa1 = 0 if pa1 < 0 else pa1
             pp1 = Kp * (q + qUpperSoil1 + gamma*h) + 2 * c * math.sqrt(Kp)
 
@@ -84,7 +83,7 @@ def makeModelObj(layers, q=0, gammaW=10):
             # p02 = 0 if p02 < 0 else p02
 
             pa2 = -(Ka * (qUpperSoil2 + gamma*h) - 2 * c *
-                    math.sqrt(Ka)+(gammaW * hw)) if not layer["isExcavation"] else 0
+                    math.sqrt(Ka)) if not layer["isExcavation"] else 0
 
             pa2 = 0 if pa2 > 0 else pa2
             pp2 = -(Kp * (qUpperSoil2 + gamma*h) + 2 * c *
