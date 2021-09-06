@@ -5,17 +5,8 @@ import json
 import math
 import copy
 
-# from numpy.matrixlib.defmatrix import matrix
-
 import model
-import model2
-import modelAP
 import solver
-import solver2
-import solver3
-import solver4
-import solver5
-import solverAP
 
 
 properties = {"pile": {"E": 210*1e3, "I": 226000000, "A": 19100}}
@@ -24,9 +15,9 @@ with open('input.json', 'rt', encoding='UTF8') as json_file:
 
 # ------------------------------------------------------------
 
-modelList = model2.modelGenerator(input)
+modelList = model.modelGenerator(input)
 modelObj = modelList[0]["model"]
-matrixObj2 = solver5.passive_active(modelObj, properties)
+matrixObj2 = solver.passive_active(modelObj, properties)
 q_0 = 1*matrixObj2["qVec"][0]
 
 y = []
@@ -48,7 +39,7 @@ hStrutList = [input["strut"][name]["h"] for name in struts]
 isStrut = False
 
 fig, ax = plt.subplots(len(modelList), 4)
-fig.set_size_inches(15, 8)
+fig.set_size_inches(18, 8)
 for i in range(len(modelList)):
     step = input["step"][i]
     hex = step["excavation"] if step["excavation"] != 0 else hex
@@ -58,12 +49,12 @@ for i in range(len(modelList)):
     isSolve = modelList[i]["solve"]
 
     if i == 0:
-        matrixObj = solver5.solver(input, modelObj, solve=isSolve)
+        matrixObj = solver.solver(input, modelObj, solve=isSolve)
     else:
         qVec0 = copy.deepcopy(matrixObj["qVec"])
         kList0 = copy.deepcopy(matrixObj["kList"])
         dispVec0 = copy.deepcopy(matrixObj["dispVec"])
-        matrixObj = solver5.solver(
+        matrixObj = solver.solver(
             input, modelObj, qVec0, kList0, dispVec0, solve=isSolve)
     result.append(matrixObj)
 

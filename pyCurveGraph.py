@@ -5,7 +5,7 @@ import math
 import copy
 
 import model
-import solver4
+import solver
 
 
 with open('layers.json', 'rt', encoding='UTF8') as json_file:
@@ -31,7 +31,7 @@ xlim = 0.05
 xList = np.arange(-xlim,xlim+dx,dx)
 p = []
 for x in xList:
-    p.append(solver4.calcForceFromPYCurve(x, pyCurve))
+    p.append(solver.calcForceFromPYCurve(x, pyCurve))
 
 
 
