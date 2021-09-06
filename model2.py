@@ -1,46 +1,69 @@
 import json
 import math
+import copy
 from matplotlib.pyplot import xlim
 import numpy as np
 
-with open('layers.json', 'rt', encoding='UTF8') as json_file:
-    layers = json.load(json_file)
+
+def modelGenerator(input):
+    result = []
+    struts = []
+    stepIndex = 0
+    hex = 0
+    for i in range(len(input["step"])):
+        step = input["step"][i]
+
+        if len(step["strut"]):
+            for name in step["strut"]:
+                struts.append(name)
+
+        # if step["excavation"]!=0:
+        stepIndex = i
+        isSolve = True if step["excavation"] != 0 else False
+        hex = step["excavation"] if step["excavation"] != 0 else hex
+        layers = copy.deepcopy(input["layers"])
+        model = makeModelObj(input, layers, struts, hex, stepIndex)
+        result.append({"solve": isSolve, "model": model})
+        print("Step:", i+1, ", ", "isSolve:", isSolve)
+        # else:
+        #     el = copy.deepcopy(result[stepIndex])
+        #     el["solve"] = False
+
+        #     result.append(el)
+
+    return result
 
 
-def makeModelObj(layers, q=0, rhoW=10):
+def makeModelObj(input, layers, struts, hex, stepIndex):
     result = {"node": [], "pressure": {"backSide": {"active": [],
                                                     "passive": [], "rest": []}, "excavationSide": {"active": [], "passive": [], "rest": []}}, "pyCurve": []}
-
     qUpperSoil1 = 0
     qUpperSoil2 = 0
-    nodeNum = 3
     pw1 = 0
     pw2 = 0
-    # dhInit = 0.01
+    nodeNum = 3
     dhInit = 0.1
-    qTestList = [[-8, -10.5], [-10.5, -13],
-                 [-13, -1], [19, 1], [1, -2], [-2, 0]]
-    hex = 1.0
-    # qTestList = [[0,-3.61],[7.6,2.0],[7.6,0],[0,-2],[-2,1.5],[1.5,-3.2]]
+    hw = input["water"]["h"]       # 수위
+    rhoW = input["water"]["rho"]    # 물의 단위중량
+    # hex = input["step"][stepIndex]["excavation"]  # 굴착깊이
+    q = input["step"][0]["surcharge"]   # 상재하중
+    hStrutList = [input["strut"][name]["h"] for name in struts]
+
     for i in range(len(layers)):
         layer = layers[i]
         h1 = layer["h1"]
         h2 = layer["h2"]
-        hw = 3.04
         Hlayer = abs(h2 - h1)   # unit: m
-        # mTest = (qTestList[i][1] - qTestList[i][0])/(h2 - h1)
-        # coeffTest = [mTest, qTestList[i][0] - mTest*h1]
 
-        # isWater = layer["isWater"]
         isWater = True if hw <= abs(h1) else False
-        rhoW = 10
+        # print("hw:", hw, "h1:", abs(h1), "h2:", abs(h2), "isWater:", isWater)
+        isExcavation = True if hex >= abs(h2) else False
+        # print("hex:", hex, "h2:", abs(h2), "isExcavation:", isExcavation)
+
         rhoSAT = layer["rhoSAT"]
         rho = layer["rho"] if not layer["isWater"] else rhoSAT - rhoW
         c = layer["c"]
         phi = layer["phi"] * math.pi/180
-        # isExcavation = isExcavation
-        isExcavation = True if hex >= abs(h2) else False
-        # print("hex:", hex, "h2:", abs(h2), "isExcavation:", isExcavation)
 
         K0 = 1 - math.sin(phi)
         Ka = (1 - math.sin(phi)) / (1 + math.sin(phi))
@@ -54,9 +77,9 @@ def makeModelObj(layers, q=0, rhoW=10):
 
         if i == 0:
             result["node"].append(
-                {"number": 1, "y": h1 + dh*2, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation})
+                {"number": 1, "y": h1 + dh*2, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "Ks": 0})
             result["node"].append(
-                {"number": 2, "y": h1 + dh*1, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation})
+                {"number": 2, "y": h1 + dh*1, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "Ks": 0})
             for j in range(2):
                 result["pyCurve"].append(
                     {"coeff": [[0, 0]], "xLim": [0, 0], "pLim": [0, 0]})
@@ -74,10 +97,27 @@ def makeModelObj(layers, q=0, rhoW=10):
 
             y = h1 - dh * num
             h = abs(h1-y)
-            # qTest = coeffTest[0] * y + coeffTest[1]
-            result["node"].append(
-                {"number": nodeNum, "y": y, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation})
 
+            isStrut = True if num == 0 and np.round(
+                abs(h1), 3) in np.round(hStrutList, 3) else False
+
+            strutIndex = 0
+            Ks = 0
+            for m in range(len(hStrutList)):
+                if num == 0 and np.round(abs(h1), 3) in np.round(hStrutList, 3):
+                    strutIndex = m
+                    name = struts[strutIndex]
+                    Es = input["strut"][name]["E"]
+                    As = input["strut"][name]["A"]
+                    Ls = input["strut"][name]["L"]
+                    Ks = Es*As/Ls
+                    break
+
+            # if isStrut:
+            #     print(isStrut, Ks)
+
+            result["node"].append(
+                {"number": nodeNum, "y": y, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "Ks": Ks})
 
             # 수압
             if isWater:
@@ -152,13 +192,12 @@ def makeModelObj(layers, q=0, rhoW=10):
             nodeNum += num
         qUpperSoil1 += rho * Hlayer
         qUpperSoil2 += rho * Hlayer if not isExcavation else 0
-        # hw += Hlayer if layer["isWater"] else 0
 
         if i == len(layers)-1:
             result["node"].append(
-                {"number": nodeNum, "y": h2 - dh*1, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation})
+                {"number": nodeNum, "y": h2 - dh*1, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "Ks": 0})
             result["node"].append(
-                {"number": nodeNum+1, "y": h2 - dh*2, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation})
+                {"number": nodeNum+1, "y": h2 - dh*2, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "Ks": 0})
             for j in range(2):
                 result["pyCurve"].append(
                     {"coeff": [[0, 0]], "xLim": [0, 0], "pLim": [0, 0]})

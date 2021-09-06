@@ -46,7 +46,6 @@ def calcForceFromPYCurve(x, pyCurve):
         else:
             p = (coeff[0][0]*x + coeff[0][1])
             Kh = coeff[0][0]
-        # print(coeff)
     else:
         if x < xLim[0]:
             p = pLim[0]
@@ -102,12 +101,13 @@ def KhFromPYCurve(p, pyCurve, i):
     return abs(Kh)
 
 
-def stiffnessMatrix(nodeInfo, EI):
+def stiffnessMatrix(nodeInfo, kList, EI):
     length = len(nodeInfo)
     kMatrix = np.zeros([length, length])
     for i in range(length):
         h = nodeInfo[i]["dh"]
-        Kh = nodeInfo[i]["Kh"]
+        Kh = kList[i]
+        Ks = nodeInfo[i]["Ks"]
         if i == 0 or i == 1:
             a = [-1, 2, 0, -2, 1] if i == 0 else [0, 1, -2, 1, 0]
             b = np.zeros(length-len(a))
@@ -120,7 +120,7 @@ def stiffnessMatrix(nodeInfo, EI):
             q = 0
         else:
             a = np.zeros(i-2)
-            alpha = 6 + (Kh) * (h**4)/EI
+            alpha = 6 + (Kh + Ks) * (h**4)/EI
             b = np.array([1, -4, alpha, -4, 1])
             c = np.append(a, b)
             d = np.zeros(length - len(a) - len(b))
@@ -130,10 +130,10 @@ def stiffnessMatrix(nodeInfo, EI):
     return kMatrix
 
 
-def calcStiffnessMat(modelProperties, forceMatrix, beforeDispMatrix, checkMatrix, node_len, EI, qVec, beforeqVec):
+def calcStiffnessMat(modelProperties, kList, forceMatrix, beforeDispMatrix, checkMatrix, node_len, EI, qVec, beforeqVec):
     errMax = 0.00000001
 
-    kMatrix = stiffnessMatrix(modelProperties["node"], EI)
+    kMatrix = stiffnessMatrix(modelProperties["node"], kList, EI)
     forceVec = forceMatrix.reshape(node_len, 1)
     kInverse = np.linalg.inv(kMatrix)
 
@@ -149,7 +149,7 @@ def calcStiffnessMat(modelProperties, forceMatrix, beforeDispMatrix, checkMatrix
     return dispVec, checkMatrix
 
 
-def modProperties(modelProperties, numTotalNode, dispVec, coeffVec, checkVec, qVecIN, p0Vec, beforeqVec, useP0=False):
+def modProperties(modelProperties, kList, numTotalNode, dispVec, coeffVec, checkVec, qVecIN, p0Vec, beforeqVec, useP0=False):
     # qVecIN = np.zeros(numTotalNode)
 
     for i in range(2, numTotalNode-2):
@@ -158,10 +158,11 @@ def modProperties(modelProperties, numTotalNode, dispVec, coeffVec, checkVec, qV
         xBefore = dispVec[i][0]
         _, Kh = calcForceFromPYCurve(xBefore, pyCurve)
         # Kh = KhFromPYCurve(beforeqVec[i], pyCurve, i)
-        if xBefore > 0:
-            qVecIN[i] -= Kh*abs(xBefore)
-        else:
-            qVecIN[i] += Kh*abs(xBefore)
+        # if xBefore > 0:
+        #     qVecIN[i] -= Kh*abs(xBefore)
+        # else:
+        #     qVecIN[i] += Kh*abs(xBefore)
+        qVecIN[i] -= Kh*xBefore
         Kh = KhFromPYCurve(qVecIN[i], pyCurve, i)
         if len(pyCurve["pLim"]) == 2:
             if qVecIN[i] > pyCurve["pLim"][0]:
@@ -177,49 +178,52 @@ def modProperties(modelProperties, numTotalNode, dispVec, coeffVec, checkVec, qV
             elif qVecIN[i] < pyCurve["pLim"][3]:
                 qVecIN[i] = pyCurve["pLim"][3]
                 # Kh = 0
-        modelProperties["node"][i]["Kh"] = Kh
+        # modelProperties["node"][i]["Kh"] = Kh
+        kList[i] = Kh
 
     forceVec = np.multiply(qVecIN,  coeffVec).reshape(numTotalNode, 1)
-    return modelProperties, forceVec, qVecIN
+    return modelProperties, kList, forceVec, qVecIN
 
 
-def renewMatrix(model, EI, numTotalNode, errMax, nodeForLoopBefore, dispVecBefore, qVecBefore, coeffVec):
-    # KhList = np.zeros(numTotalNode-4)
-    qVecIN = copy.deepcopy(qVecBefore)
-    qVecNew = copy.deepcopy(qVecBefore)
-    nodeForLoopNew = copy.deepcopy(nodeForLoopBefore)
-    checkVec = np.zeros(numTotalNode-4)
-
-    for i in range(2, numTotalNode-2):
-        checkNum = i-2
-        isExcavation = model["node"][i]["isExcavation"]
-        pyCurve = model["pyCurve"][i]
-        xBefore = dispVecBefore[i][0]
-        pForCheck, KhForCheck = calcForceFromPYCurve(xBefore, pyCurve)
-        # KhForCheck = KhFromPYCurve(pForCheck, pyCurve, i)
-        nodeForLoopNew[i]["Kh"] = KhForCheck
-        qVecIN[i] = pForCheck
-
-    kMatrix = stiffnessMatrix(nodeForLoopNew, EI)
-    kInverse = np.linalg.inv(kMatrix)
-    forceVec = np.multiply(qVecIN, coeffVec).reshape(numTotalNode, 1)
-    dispVecNew = np.matmul(kInverse, forceVec)
-
-    for i in range(2, numTotalNode-2):
-        checkNum = i-2
-        isExcavation = model["node"][i]["isExcavation"]
-        pyCurve = model["pyCurve"][i]
-        err = dispVecBefore[i][0] - dispVecNew[i][0]
-        check = abs(err) <= errMax
-        checkVec[checkNum] = check
-        qVecNew[i], KhNew = calcForceFromPYCurve(dispVecBefore[i][0], pyCurve)
-
-        nodeForLoopNew[i]["Kh"] = KhNew
-
-    return {"checkVec": checkVec, "qVec": qVecNew, "nodeForLoop": nodeForLoopNew}
+def calcShearForce(model, dispVec, numTotalNode, EI):
+    nodeInfo = model["node"]
+    length = len(nodeInfo)
+    vMatrix = np.zeros([length, length])
+    for i in range(length):
+        h = nodeInfo[i]["dh"]
+        if not i in [0, 1, numTotalNode-2, numTotalNode-1]:
+            a = np.zeros(i-2)
+            b = [-1, 2, 0, -2, 1]
+            c = np.append(a, b)
+            d = np.zeros(length-len(c))
+            Ki = np.append(c, d)
+            vMatrix[i, :] = Ki
+        else:
+            vMatrix[i] = np.zeros(numTotalNode)
+    vVec = np.matmul(vMatrix, dispVec.reshape(numTotalNode, 1)) * EI / (2*h**3)
+    return vVec
 
 
-def solver(model_immutable, properties):
+def calcMoment(model, dispVec, numTotalNode, EI):
+    nodeInfo = model["node"]
+    length = len(nodeInfo)
+    mMatrix = np.zeros([length, length])
+    for i in range(length):
+        h = nodeInfo[i]["dh"]
+        if not i in [0, 1, numTotalNode-2, numTotalNode-1]:
+            a = np.zeros(i-1)
+            b = [1, -2, 1]
+            c = np.append(a, b)
+            d = np.zeros(length-len(c))
+            Ki = np.append(c, d)
+            mMatrix[i, :] = Ki
+        else:
+            mMatrix[i] = np.zeros(numTotalNode)
+    mVec = np.matmul(mMatrix, dispVec.reshape(numTotalNode, 1)) * EI / (h**2)
+    return mVec
+
+
+def solver(input, model_immutable, qVec0=np.array([]), kList0=np.array([]), dispVec0=np.array([]), **kwargs):
     numTotalNode = len(model_immutable["node"])
     numRealNode = len(model_immutable["node"]) - 4
 
@@ -228,49 +232,56 @@ def solver(model_immutable, properties):
     coeffVec = np.zeros(numTotalNode)
     forceVec = np.zeros(numTotalNode)
     dispVec = np.zeros(numTotalNode)
-    KhList = np.zeros(numRealNode)
+    kList = np.zeros(numTotalNode)
     checkVec = np.zeros(numRealNode)
 
-    errMax = 0.001
-
-    E = properties["pile"]["E"] * 1e3   # unit: kPa
-    I = properties["pile"]["I"] * 1e-12  # unit: m^4
+    E = input["wall"]["E"]   # unit: kPa
+    I = input["wall"]["I"]   # unit: m^4
     EI = E*I
     beforeqVec = copy.deepcopy(qVec)
     # setup qVec, forceVec and coeffVec
     for i in range(numTotalNode):
         h = model["node"][i]["dh"]
-        qVec[i] = model["pressure"]["backSide"]["rest"][i] + \
-            model["pressure"]["excavationSide"]["rest"][i]
-        # qVec[i] = model["node"][i]["qTest"]
         coeffVec[i] = (h**4)
+
+        if len(qVec0) == 0:
+            qVec[i] = model["pressure"]["backSide"]["rest"][i] + \
+                model["pressure"]["excavationSide"]["rest"][i]
+            kList[i] = model["node"][i]["Kh"]
+        else:
+            qVec[i] = qVec0[0][i]
+            kList[i] = kList0[i]
+
         forceVec[i] = qVec[i] * coeffVec[i]
-    
 
-    beforeDispVec = copy.deepcopy(dispVec)
-
-    forceVec = forceVec.reshape(numTotalNode, 1)
-    dispVec, checkVec = calcStiffnessMat(
-        model, forceVec, dispVec, checkVec, numTotalNode, EI, qVec, beforeqVec)
-    p0Vec = copy.deepcopy(qVec)
-    test = 0
-    while False in checkVec and test != 500:
-        # print("here")
-        beforeqVec = copy.deepcopy(qVec)
-        model, forceVec, qVec = modProperties(
-            model, numTotalNode, dispVec, coeffVec, checkVec, copy.deepcopy(qVec), p0Vec, beforeqVec)
-
+    isSolve = kwargs["solve"]
+    if isSolve:
         beforeDispVec = copy.deepcopy(dispVec)
+        forceVec = forceVec.reshape(numTotalNode, 1)
         dispVec, checkVec = calcStiffnessMat(
-            model, forceVec, beforeDispVec, checkVec, numTotalNode, EI, qVec, beforeqVec)
+            model, kList, forceVec, dispVec, checkVec, numTotalNode, EI, qVec, beforeqVec)
+        p0Vec = copy.deepcopy(qVec)
+        numIter = 0
+        while False in checkVec and numIter != 1000:
+            beforeqVec = copy.deepcopy(qVec)
+            model, kList, forceVec, qVec = modProperties(
+                model, kList, numTotalNode, dispVec, coeffVec, checkVec, copy.deepcopy(qVec), p0Vec, beforeqVec)
 
-        test += 1
-        # print(test)
+            beforeDispVec = copy.deepcopy(dispVec)
+            dispVec, checkVec = calcStiffnessMat(
+                model, kList, forceVec, beforeDispVec, checkVec, numTotalNode, EI, qVec, beforeqVec)
 
-    # print(test)
-    print(checkVec, test)
+            numIter += 1
+        print("Convergence:", "Success" if not False in checkVec else "Fail",
+              ", ", "Number of iteration:", numIter)
+    else:
+        dispVec = dispVec0
 
-    return {"qVec": qVec.reshape(1, numTotalNode), "dispVec": dispVec.reshape(1, numTotalNode), "beforeDispVec": beforeDispVec.reshape(1, numTotalNode)}
+    vVec = calcShearForce(model, dispVec, numTotalNode, EI)
+    mVec = calcMoment(model, dispVec, numTotalNode, EI)
+
+    # return {"kList": kList, "qVec": qVec.reshape(1, numTotalNode), "dispVec": dispVec.reshape(1, numTotalNode), "beforeDispVec": beforeDispVec.reshape(1, numTotalNode)}
+    return {"kList": kList, "qVec": qVec.reshape(1, numTotalNode), "dispVec": dispVec.reshape(1, numTotalNode), "vVec": vVec.reshape(1, numTotalNode), "mVec": mVec.reshape(1, numTotalNode)}
 
 
 def passive_active(model, properties):
