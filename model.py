@@ -73,13 +73,13 @@ def makeModelObj(input, layers, struts, hex, stepIndex):
         dh = Hlayer/numEle
         Kh = layer["Kh"]    # unit: kN/m3
         # kh = Kh if not isExcavation else 0  # unit: kN/m2
-        kh = Kh*dh
+        # kh = Kh*dh
 
         if i == 0:
             result["node"].append(
-                {"number": 1, "y": h1 + dh*2, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "Ks": 0})
+                {"number": 1, "y": h1 + dh*2, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "Ks": 0})
             result["node"].append(
-                {"number": 2, "y": h1 + dh*1, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "Ks": 0})
+                {"number": 2, "y": h1 + dh*1, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "Ks": 0})
             for j in range(2):
                 result["pyCurve"].append(
                     {"coeff": [[0, 0]], "xLim": [0, 0], "pLim": [0, 0]})
@@ -117,7 +117,7 @@ def makeModelObj(input, layers, struts, hex, stepIndex):
             #     print(isStrut, Ks)
 
             result["node"].append(
-                {"number": nodeNum, "y": y, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "Ks": Ks})
+                {"number": nodeNum, "y": y, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "Ks": Ks})
 
             # 수압
             if isWater:
@@ -195,9 +195,9 @@ def makeModelObj(input, layers, struts, hex, stepIndex):
 
         if i == len(layers)-1:
             result["node"].append(
-                {"number": nodeNum, "y": h2 - dh*1, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "Ks": 0})
+                {"number": nodeNum, "y": h2 - dh*1, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "Ks": 0})
             result["node"].append(
-                {"number": nodeNum+1, "y": h2 - dh*2, "kh": kh, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "Ks": 0})
+                {"number": nodeNum+1, "y": h2 - dh*2, "Kh": Kh, "dh": dh, "isExcavation": isExcavation, "Ks": 0})
             for j in range(2):
                 result["pyCurve"].append(
                     {"coeff": [[0, 0]], "xLim": [0, 0], "pLim": [0, 0]})

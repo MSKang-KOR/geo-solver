@@ -262,7 +262,7 @@ def solver(input, model_immutable, qVec0=np.array([]), kList0=np.array([]), disp
             model, kList, forceVec, dispVec, checkVec, numTotalNode, EI, qVec, beforeqVec)
         p0Vec = copy.deepcopy(qVec)
         numIter = 0
-        while False in checkVec and numIter != 1000:
+        while False in checkVec and numIter != 3000:
             beforeqVec = copy.deepcopy(qVec)
             model, kList, forceVec, qVec = modProperties(
                 model, kList, numTotalNode, dispVec, coeffVec, checkVec, copy.deepcopy(qVec), p0Vec, beforeqVec)
