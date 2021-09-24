@@ -65,7 +65,19 @@
             ]
         },
         {
-            "excavation": 2.5,
+            "excavation": 3,
+            "surcharge": 0,
+            "strut": []
+        },
+        {
+            "excavation": 0,
+            "surcharge": 0,
+            "strut": [
+                "B"
+            ]
+        },
+        {
+            "excavation": 5,
             "surcharge": 0,
             "strut": []
         }
@@ -86,6 +98,22 @@
             "E": 210000000,
             "I": 0.000204,
             "h": 0.5
+        },
+        "B": {
+            "name": "SS275",
+            "L": 6,
+            "A": 0.01198,
+            "E": 210000000,
+            "I": 0.000204,
+            "h": 1
+        },
+        "C": {
+            "name": "SS275",
+            "L": 6,
+            "A": 0.01198,
+            "E": 210000000,
+            "I": 0.000204,
+            "h": 1.5
         }
     },
     "water": {
@@ -136,6 +164,21 @@
             "isWater": false,
             "strut": false,
             "h1": -1,
+            "h2": -1
+        },
+        {
+            "name": "매립토",
+            "rho": 18,
+            "rhoSAT": 19,
+            "phi": 27,
+            "c": 0,
+            "h": 1.4,
+            "N": 11,
+            "Kh": 12177.78,
+            "isExcavation": false,
+            "isWater": false,
+            "strut": false,
+            "h1": -1,
             "h2": -1.4
         },
         {
@@ -151,7 +194,7 @@
             "isWater": false,
             "strut": false,
             "h1": -1.4,
-            "h2": -2.5
+            "h2": -3
         },
         {
             "name": "붕적층",
@@ -165,7 +208,7 @@
             "isExcavation": false,
             "isWater": false,
             "strut": false,
-            "h1": -2.5,
+            "h1": -3,
             "h2": -3.04
         },
         {
@@ -196,6 +239,21 @@
             "isWater": false,
             "strut": false,
             "h1": -4.62,
+            "h2": -5
+        },
+        {
+            "name": "풍화토",
+            "rho": 19,
+            "rhoSAT": 20,
+            "phi": 29,
+            "c": 21,
+            "h": 18.12,
+            "N": 42,
+            "Kh": 26987.89,
+            "isExcavation": false,
+            "isWater": false,
+            "strut": false,
+            "h1": -5,
             "h2": -6.916
         }
     ]

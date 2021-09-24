@@ -70,7 +70,7 @@ def makeModelObj(input, layers, struts, hex, stepIndex):
         Kp = 1 / Ka
 
         numEle = round(Hlayer/dhInit)
-        dh = Hlayer/numEle
+        dh = Hlayer/numEle if numEle!=0 else Hlayer
         Kh = layer["Kh"]    # unit: kN/m3
         # kh = Kh if not isExcavation else 0  # unit: kN/m2
         # kh = Kh*dh
