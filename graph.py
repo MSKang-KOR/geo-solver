@@ -7,6 +7,7 @@ import copy
 
 import model
 import solver
+import polynomial
 
 
 properties = {"pile": {"E": 210*1e3, "I": 226000000, "A": 19100}}
@@ -32,6 +33,7 @@ hWater = input["water"]["h"]
 struts = []
 hStrutList = []
 
+disps = []
 fig, ax = plt.subplots(len(modelList), 4)
 fig.set_size_inches(18, 9)
 
@@ -78,10 +80,9 @@ for i in range(len(modelList)):
     v = step["vVec"][0]
     m = step["mVec"][0]
 
-    graphFig1 = ax[i, 0] if len(modelList) != 1 else ax[0]
-    graphFig2 = ax[i, 1] if len(modelList) != 1 else ax[1]
-    graphFig3 = ax[i, 2] if len(modelList) != 1 else ax[2]
-    graphFig4 = ax[i, 3] if len(modelList) != 1 else ax[3]
+    disps.append(np.concatenate(
+        (step["dispVec"].T, np.array(y).reshape(len(y), 1)), axis=1))
+    # print(np.shape(disps[0]))
 
     qMax = max([abs(min(q[2:len(q)-3])), abs(max(q[2:len(q)-3]))])
     indexMaxQTuple = np.where(q == qMax) if qMax in q else np.where(q == -qMax)
@@ -89,14 +90,14 @@ for i in range(len(modelList)):
     xMaxQ = round(q[indexMaxQ], 3)
     yMaxQ = y[indexMaxQ]
     qLim = qMax * 2
-    graphFig1.plot(xStan, y, label='$pile$', color='g', linewidth=2)
-    graphFig1.plot(q, y, label='$pressure$', color='r')
-    graphFig1.set_ylabel('Depth ($m$)')
-    graphFig1.set_xlim(-qLim, qLim)
-    graphFig1.set_ylim(-hWall, 0)
-    graphFig1.annotate('Max: {0}'.format(xMaxQ), xy=(
+    ax[i, 0].plot(xStan, y, label='$pile$', color='g', linewidth=2)
+    ax[i, 0].plot(q, y, label='$pressure$', color='r')
+    ax[i, 0].set_ylabel('Depth ($m$)')
+    ax[i, 0].set_xlim(-qLim, qLim)
+    ax[i, 0].set_ylim(-hWall, 0)
+    ax[i, 0].annotate('Max: {0}'.format(xMaxQ), xy=(
         xMaxQ, yMaxQ), xytext=(xMaxQ - abs(xMaxQ)/2, yMaxQ), fontsize=7)
-    graphFig1.grid(True)
+    ax[i, 0].grid(True)
 
     dispMax = max([abs(min(disp[2:len(disp)-3])),
                   abs(max(disp[2:len(disp)-3]))])
@@ -108,14 +109,14 @@ for i in range(len(modelList)):
     xTextDisp = xMaxDisp + abs(xMaxDisp)/2
     yTextDisp = yMaxDisp if np.round(yMaxDisp, 3) != .0 else yMaxDisp - 0.35
     dispLim = dispMax * 4
-    graphFig2.plot(xStan, y, label='$pile$', color='g', linewidth=2)
-    graphFig2.plot(disp, y, label='$Displacement$', color='r')
-    graphFig2.set_xlim(dispLim, -dispLim)
-    graphFig2.set_ylim(-hWall, 0)
-    graphFig2.annotate('Max: {0}'.format(xMaxDisp), xy=(
+    ax[i, 1].plot(xStan, y, label='$pile$', color='g', linewidth=2)
+    ax[i, 1].plot(disp, y, label='$Displacement$', color='r')
+    ax[i, 1].set_xlim(dispLim, -dispLim)
+    ax[i, 1].set_ylim(-hWall, 0)
+    ax[i, 1].annotate('Max: {0}'.format(xMaxDisp), xy=(
         xMaxDisp, yMaxDisp), xytext=(xTextDisp, yTextDisp), fontsize=7)
-    graphFig2.ticklabel_format(axis="x", style="sci", scilimits=(0, 0))
-    graphFig2.grid(True)
+    ax[i, 1].ticklabel_format(axis="x", style="sci", scilimits=(0, 0))
+    ax[i, 1].grid(True)
 
     vMax = max([abs(min(v[2:len(v)-3])), abs(max(v[2:len(v)-3]))])
     indexMaxVTuple = np.where(v == vMax) if vMax in v else np.where(v == -vMax)
@@ -123,13 +124,13 @@ for i in range(len(modelList)):
     xMaxV = round(v[indexMaxV], 3)
     yMaxV = y[indexMaxV]
     vLim = vMax * 2
-    graphFig3.plot(xStan, y, label='$pile$', color='g', linewidth=2)
-    graphFig3.plot(v, y, label='$ShearForce$', color='r')
-    graphFig3.set_xlim(-vLim, vLim)
-    graphFig3.set_ylim(-hWall, 0)
-    graphFig3.annotate('Max: {0}'.format(xMaxV), xy=(
+    ax[i, 2].plot(xStan, y, label='$pile$', color='g', linewidth=2)
+    ax[i, 2].plot(v, y, label='$ShearForce$', color='r')
+    ax[i, 2].set_xlim(-vLim, vLim)
+    ax[i, 2].set_ylim(-hWall, 0)
+    ax[i, 2].annotate('Max: {0}'.format(xMaxV), xy=(
         xMaxV, yMaxV), xytext=(xMaxV - abs(xMaxV)/2, yMaxV), fontsize=7)
-    graphFig3.grid(True)
+    ax[i, 2].grid(True)
 
     mMax = max([abs(min(m[2:len(m)-3])), abs(max(m[2:len(m)-3]))])
     indexMaxMTuple = np.where(m == mMax) if mMax in m else np.where(m == -mMax)
@@ -138,13 +139,13 @@ for i in range(len(modelList)):
     yMaxM = y[indexMaxM]
     mLim = mMax * 2
     mLim = max([abs(min(m)), abs(max(m))]) * 2
-    graphFig4.plot(xStan, y, label='$pile$', color='g', linewidth=2)
-    graphFig4.plot(m, y, label='$ShearForce$', color='r')
-    graphFig4.set_xlim(-mLim, mLim)
-    graphFig4.set_ylim(-hWall, 0)
-    graphFig4.annotate('Max: {0}'.format(xMaxM), xy=(
+    ax[i, 3].plot(xStan, y, label='$pile$', color='g', linewidth=2)
+    ax[i, 3].plot(m, y, label='$ShearForce$', color='r')
+    ax[i, 3].set_xlim(-mLim, mLim)
+    ax[i, 3].set_ylim(-hWall, 0)
+    ax[i, 3].annotate('Max: {0}'.format(xMaxM), xy=(
         xMaxM, yMaxM), xytext=(xMaxM - abs(xMaxM)/2, yMaxM), fontsize=7)
-    graphFig4.grid(True)
+    ax[i, 3].grid(True)
 
     xLimList = [qLim, dispLim, vLim, mLim]
     ySurfBack = np.ones(100)*(-hWall)
@@ -211,4 +212,8 @@ for i in range(len(modelList)):
     maxObj = {"q": xMaxQ, "u": xMaxDisp, "v": xMaxV, "m": xMaxM}
     maxObjList.append(maxObj)
 
-plt.show()
+# plt.show()
+
+measured = [[0.0001, 0], [0.00005, -0.5], [0, -1]]
+# measured = [[0.0001, 0]]
+test = polynomial.polynomialFitForDisp(1, 1, measured, disps, 4)

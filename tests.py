@@ -1,17 +1,10 @@
 
 import numpy as np
 
-a = [1,2,3,4,5]
+a = np.ones(5).reshape(5,1)
+b = np.zeros(5).reshape(5,1)
 
-def test(a):
-    # b = np.array(a)
-    # b = 10*b
-    return np.array(a)
-
-b = test(a)
-
-print(type(a))
-print(type(b))
-
-a = [1,2]
-print(a.index(-2) if -2 in a else a.index(2))
+# print(np.shape(a))
+# print(np.shape(a.T))
+c = np.concatenate((a,b),axis=1)
+print(c)
