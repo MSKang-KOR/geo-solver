@@ -10,15 +10,15 @@ import solver
 
 
 properties = {"pile": {"E": 210*1e3, "I": 226000000, "A": 19100}}
-with open('input2.json', 'rt', encoding='UTF8') as json_file:
+with open('input3.json', 'rt', encoding='UTF8') as json_file:
     input = json.load(json_file)
 
 # ------------------------------------------------------------
 
 modelList = model.modelGenerator(input)
 modelObj = modelList[0]["model"]
-matrixObj2 = solver.passive_active(modelList[2]["model"], properties)
-qTest = 1*matrixObj2["qVec3"][0]
+# matrixObj2 = solver.passive_active(modelList[2]["model"], properties)
+# qTest = 1*matrixObj2["qVec3"][0]
 
 y = []
 for node in modelObj["node"]:

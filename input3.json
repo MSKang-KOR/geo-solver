@@ -1,0 +1,178 @@
+{
+  "wall": {
+      "type": "SheetPile",
+      "name": "SS275",
+      "h": 6.916,
+      "E": 210000000,
+      "A": 0.0191,
+      "I": 0.000226
+  },
+  "step": [
+      {
+          "excavation": 1,
+          "surcharge": 15,
+          "strut": [
+              "0"
+          ]
+      }
+  ],
+  "strut": {
+      "0": {
+          "name": "SS275",
+          "L": 6,
+          "A": 0.01198,
+          "E": 210000000,
+          "I": 0.000204,
+          "h": 1.654
+      }
+  },
+  "soil": [
+      {
+          "name": "매립토",
+          "rho": 18,
+          "rhoSAT": 19,
+          "phi": 27,
+          "c": 0,
+          "h": 1.4,
+          "N": 11,
+          "Kh": 12177.78
+      },
+      {
+          "name": "붕적층",
+          "rho": 18,
+          "rhoSAT": 19,
+          "phi": 29,
+          "c": 5,
+          "h": 4.62,
+          "N": 35,
+          "Kh": 25461.83
+      },
+      {
+          "name": "풍화토",
+          "rho": 19,
+          "rhoSAT": 20,
+          "phi": 29,
+          "c": 21,
+          "h": 18.12,
+          "N": 42,
+          "Kh": 26987.89
+      },
+      {
+          "name": "풍화암",
+          "rho": 21,
+          "rhoSAT": 22,
+          "phi": 32,
+          "c": 29,
+          "h": 20.62,
+          "N": 50,
+          "Kh": 75532.18
+      },
+      {
+          "name": "연암",
+          "rho": 23,
+          "rhoSAT": 24,
+          "phi": 35,
+          "c": 360,
+          "h": 623.62,
+          "N": 50,
+          "Kh": 80510.88
+      }
+  ],
+  "water": {
+      "h": 0.00304,
+      "rho": 10
+  },
+  "layers": [
+      {
+          "name": "매립토",
+          "rho": 18,
+          "rhoSAT": 19,
+          "phi": 27,
+          "c": 0,
+          "h": 1.4,
+          "N": 11,
+          "Kh": 12177.78,
+          "isExcavation": false,
+          "isWater": false,
+          "strut": false,
+          "h1": 0,
+          "h2": -0.00304
+      },
+      {
+          "name": "매립토",
+          "rho": 18,
+          "rhoSAT": 19,
+          "phi": 27,
+          "c": 0,
+          "h": 1.4,
+          "N": 11,
+          "Kh": 12177.78,
+          "isExcavation": false,
+          "isWater": false,
+          "strut": false,
+          "h1": -0.00304,
+          "h2": -1
+      },
+      {
+          "name": "매립토",
+          "rho": 18,
+          "rhoSAT": 19,
+          "phi": 27,
+          "c": 0,
+          "h": 1.4,
+          "N": 11,
+          "Kh": 12177.78,
+          "isExcavation": false,
+          "isWater": false,
+          "strut": false,
+          "h1": -1,
+          "h2": -1.4
+      },
+      {
+          "name": "붕적층",
+          "rho": 18,
+          "rhoSAT": 19,
+          "phi": 29,
+          "c": 5,
+          "h": 4.62,
+          "N": 35,
+          "Kh": 25461.83,
+          "isExcavation": false,
+          "isWater": false,
+          "strut": false,
+          "h1": -1.4,
+          "h2": -1.654
+      },
+      {
+          "name": "붕적층",
+          
+          "rho": 18,
+          "rhoSAT": 19,
+          "phi": 29,
+          "c": 5,
+          "h": 4.62,
+          "N": 35,
+          "Kh": 25461.83,
+          "isExcavation": false,
+          "isWater": false,
+          "strut": false,
+          "h1": -1.654,
+          "h2": -4.62
+      },
+      {
+          "name": "풍화토",
+          "rho": 19,
+          "rhoSAT": 20,
+          "phi": 29,
+          "c": 21,
+          "h": 18.12,
+          "N": 42,
+          "Kh": 26987.89,
+          "isExcavation": false,
+          "isWater": false,
+          "strut": false,
+          "h1": -4.62,
+          "h2": -6.916
+      }
+  ]
+}
